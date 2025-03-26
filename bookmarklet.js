@@ -1,7 +1,9 @@
 javascript:(function(){
   const HEADERS = ["Module Name","Installed Version","Recommended Version"];
-  const excludedModules = window._excludedModules || new Set();
-  window._excludedModules = excludedModules;
+  if (!window._excludedModules) {
+    window._excludedModules = new Set();
+  }
+  const excludedModules = window._excludedModules;
 
   function cleanText(text){return text.replace(/<a[^>]*>|<\/a>/g,"").replace(/\(Release notes\)/gi,"").replace(/\s+/g," ").trim();}
   function cleanVersion(version){return version.replace(/^8\.x-/,"");}
@@ -77,8 +79,8 @@ javascript:(function(){
 
     function formatCommitMessage(core,contrib){
       return `Update Drupal modules (${getCurrentDate()})\n\n`+
-        (core.length?"Core updates:\n"+core.map(r=>`- ${r[1]} (${r[2]} → ${r[3]})`).join("\n")+"\n\n":"")+
-        (contrib.length?"Contrib module updates:\n"+contrib.map(r=>`- ${r[1]} (${r[2]} → ${r[3]})`).join("\n"):"");
+          (core.length?"Core updates:\n"+core.map(r=>`- ${r[1]} (${r[2]} → ${r[3]})`).join("\n")+"\n\n":"")+
+          (contrib.length?"Contrib module updates:\n"+contrib.map(r=>`- ${r[1]} (${r[2]} → ${r[3]})`).join("\n"):"");
     }
 
     let core=[],contrib=[],securityOnly=filter==="security";
@@ -90,9 +92,9 @@ javascript:(function(){
       core.forEach(([m,h,f,t])=>{
         if(m==="core" || h.toLowerCase().includes("drupal core")){
           lines.push(
-            `drupal/core-recommended:^${t}`,
-            `drupal/core-composer-scaffold:^${t}`,
-            `drupal/core-project-message:^${t}`
+              `drupal/core-recommended:^${t}`,
+              `drupal/core-composer-scaffold:^${t}`,
+              `drupal/core-project-message:^${t}`
           );
         }
       });
