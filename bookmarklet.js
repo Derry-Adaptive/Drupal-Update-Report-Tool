@@ -28,10 +28,13 @@ javascript:(function(){
     if(action==="help"){
       console.log('✅ "generateUpdateReport" is ready to use');
       console.log('📦 REPORT OUTPUT');
-      console.log('🔹 generateUpdateReport(); → CSV of all updates (default)');
-      console.log('🔹 generateUpdateReport("csv", "security");');
-      console.log('🔹 generateUpdateReport("ascii"); generateUpdateReport("commit");');
-      console.log('🔹 generateUpdateReport("composer");');
+      console.log('🔹 generateUpdateReport(type = "csv", scope = "all");');
+      console.log('   • type: "csv" → Download a CSV file of available updates (default)');
+      console.log('   • type: "ascii" → Output ASCII table to console');
+      console.log('   • type: "commit" → Generate commit message summary');
+      console.log('   • type: "composer" → Output Composer require command');
+      console.log('   • scope: "all" (default) → Include all available updates');
+      console.log('   • scope: "security" → Limit output to security updates only');
       console.log('🧰 EXCLUDE / UNLOAD');
       console.log('🔹 generateUpdateReport("add_exclude", "module_name");');
       console.log('🔹 generateUpdateReport("remove_exclude", "module_name");');

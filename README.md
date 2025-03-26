@@ -43,32 +43,36 @@ It supports:
 
 ## ✅ Available Commands
 
-### 📦 Output Reports
+### 📦 Output Reports (Syntax)
+
 ```js
-generateUpdateReport();                        // CSV (default)
-generateUpdateReport("csv", "security");       // CSV of security-only updates
-generateUpdateReport("ascii");                 // ASCII table of all updates
-generateUpdateReport("ascii", "security");     // ASCII table, security only
-generateUpdateReport("commit");                // Git commit message
-generateUpdateReport("commit", "security");    // Git commit message (security)
-generateUpdateReport("composer");              // Composer require command
-generateUpdateReport("composer", "security");  // Composer (security only)
+generateUpdateReport(type = "csv", scope = "all");
 ```
+
+### 🔍 Type Options:
+- `"csv"` (default): Download a CSV of all updates
+- `"ascii"`: Print table of updates to console
+- `"commit"`: Output Git-style commit message
+- `"composer"`: Output a `composer require` command
+
+### 🎯 Scope Options:
+- `"all"` (default): Include all updates
+- `"security"`: Limit to security updates only
 
 ---
 
 ### 🔧 Exclude Modules (Session-only)
 ```js
-generateUpdateReport("add_exclude", "module_name");     // Add module to exclusion list
-generateUpdateReport("remove_exclude", "module_name");  // Remove exclusion
-generateUpdateReport("exclude_list");                   // Show excluded modules
+generateUpdateReport("add_exclude", "module_name");     // Add to exclusion list
+generateUpdateReport("remove_exclude", "module_name");  // Remove from exclusion list
+generateUpdateReport("exclude_list");                   // Show current exclusions
 ```
 
 ---
 
 ### 🧹 Help
 ```js
-generateUpdateReport("help");  // Show help instructions in console
+generateUpdateReport("help");
 ```
 
 ---
@@ -78,7 +82,7 @@ generateUpdateReport("help");  // Show help instructions in console
 - Exclusion list is reset on page reload — perfect for testing across multiple sites.
 - CSV export triggers automatic download with site name and date.
 - Composer output uses machine names from drupal.org project links.
-- `8.x-` version prefixes are cleaned up for Composer compatibility.
+- `8.x-` version prefixes are cleaned for Composer compatibility.
 - Special characters in module names are safely quoted.
 
 ---
