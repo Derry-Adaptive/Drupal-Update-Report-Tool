@@ -35,6 +35,7 @@ It supports:
 ### 🔖 Bookmarklet
 1. Open `bookmarklet_in_memory_excludes.js`
 2. Copy the full `javascript:(function(){...})();` code
+Script .  
 3. Create a new bookmark in your browser
 4. Paste the code into the URL field
 5. Visit `/admin/reports/updates` and click the bookmark
@@ -85,5 +86,5 @@ generateUpdateReport("help");  // Show help instructions in console
 
 ## 👥 Author
 
-Script generated with ❤️ by [Your Name / Team].  
+By Derry White
 Open to contributions and improvements!
