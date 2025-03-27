@@ -24,7 +24,7 @@ javascript:(function(){
 
   function getCurrentDate(){return new Date().toISOString().split("T")[0];}
 
-  function generateUpdateReport(action="help",filter="all"){
+  function generateUpdateReport(action="csv",filter="all"){
     if(action==="help"){
       console.log('✅ "generateUpdateReport" is ready to use');
       console.log('📦 REPORT OUTPUT');
