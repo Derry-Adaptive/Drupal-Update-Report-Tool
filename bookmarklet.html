@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Drupal Update Helper Bookmarklet</title>
+</head>
+<body>
+  <h1>Bookmarklet Link</h1>
+  <p>Drag this to your bookmarks bar:</p>
+
+  <a id="bookmarklet" href="#">Loading…</a>
+
+  <script>
+    fetch('generateUpdateReport.js')
+      .then(res => res.text())
+      .then(code => {
+        // Minify: remove line breaks, collapse spaces
+        let minified = code
+          .replace(/\/\/.*|\/\*[\s\S]*?\*\//g, '') // remove comments
+          .replace(/\n/g, ' ')                    // remove newlines
+          .replace(/\s{2,}/g, ' ')                // collapse spaces
+          .trim();
+
+        // Wrap in bookmarklet
+        const bookmarklet = `javascript:(function(){${minified}})();`;
+        const encoded = encodeURI(bookmarklet);
+
+        const link = document.getElementById('bookmarklet');
+        link.href = encoded;
+        link.textContent = '🧩 generateUpdateReport() Bookmarklet';
+      });
+  </script>
+</body>
+</html>
