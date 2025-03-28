@@ -44,20 +44,39 @@ function quoteCSV(val) {
 
 function generateUpdateReport(action = "csv", filter = "all") {
   if (action === "help") {
-    console.log('✅ "generateUpdateReport" is ready to use');
-    console.log('📦 REPORT OUTPUT');
-    console.log('🔹 generateUpdateReport(type = "csv", scope = "all");');
-    console.log('   • type: "csv" → Download a CSV file of available updates (default)');
-    console.log('   • type: "ascii" → Output ASCII table to console');
-    console.log('   • type: "commit" → Generate commit message summary');
-    console.log('   • type: "composer" → Output Composer require command');
-    console.log('   • scope: "all" (default) → Include all available updates');
-    console.log('   • scope: "security" → Limit output to security updates only');
-    console.log('🧰 EXCLUDE / UNLOAD');
-    console.log('🔹 generateUpdateReport("add_exclude", "module_name");');
-    console.log('🔹 generateUpdateReport("remove_exclude", "module_name");');
-    console.log('🔹 generateUpdateReport("exclude_list");');
-    console.log('   • Supports wildcards like "admin*", "drupal/*"');
+ console.log(`
+🔧 generateUpdateReport([type], [scope]) — Drupal Module Update Helper
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📦 TYPE (output format)
+  "csv"         → Download a CSV file of available updates
+  "ascii"       → Output a clean table to the console
+  "commit"      → Print commit message summary
+  "composer"    → Output a 'composer require' command
+
+🎯 SCOPE (optional filter)
+  "all"         → Include all available updates (default)
+  "security"    → Limit output to security updates only
+
+📌 USAGE
+  generateUpdateReport("ascii")                  → All updates
+  generateUpdateReport("csv", "security")        → Security-only CSV
+  generateUpdateReport("composer")               → Composer command for all
+
+🚫 EXCLUDE MODULES
+  generateUpdateReport("add_exclude", "token")      → Exclude modules matching "token"
+  generateUpdateReport("add_exclude", "admin")      → Match by part of name or project URL
+  generateUpdateReport("remove_exclude", "admin")   → Remove exclusion
+  generateUpdateReport("exclude_list")              → View current exclude filters
+
+💡 TIPS
+  • Excludes match module name and drupal.org/project/* path (case-insensitive)
+  • Partial names and patterns like "media", "admin", "views" are supported
+  • Filters are stored only in memory (browser tab session)
+  • Run after exclusions: generateUpdateReport("ascii") or ("composer")
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`);
     return;
   }
 
