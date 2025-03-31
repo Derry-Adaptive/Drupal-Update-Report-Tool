@@ -7,15 +7,40 @@ if (!window._excludedModules) {
 const excludedModules = window._excludedModules;
 
 function cleanText(text) {
-  return text
-    .replace(/<a[^>]*>|<\/a>/g, "")
-    .replace(/\(Release notes\)/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  if (!text) return "";
+  return text.replace(/<a[^>]*>|<\/a>/g, "")
+             .replace(/\(Release notes\)/gi, "")
+             .replace(/\s+/g, " ")
+             .trim();
 }
 
 function cleanVersion(version) {
-  return version.replace(/^8\.x-/, "");
+  return version.replace(/^8\.x-/, "").trim();
+}
+
+function escapeCSVValue(value) {
+  if (!value) return '""';
+  const str = String(value).replace(/"/g, '""');
+  return `"${str}"`;
+}
+
+function isModuleExcluded(machine, human) {
+    const lowerHuman = human.toLowerCase();
+
+    for (let pattern of excludedModules) {
+        if (pattern.includes("*")) {
+            const regexPattern = pattern.replace(/\*/g, ".*");
+            const regex = new RegExp(regexPattern, "i");
+            if (regex.test(machine) || regex.test(lowerHuman)) {
+                return true;
+            }
+        } else {
+            if (pattern === machine || pattern === lowerHuman) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 function extractModuleNames(cell) {
@@ -32,85 +57,51 @@ function extractModuleNames(cell) {
   return { machine, human };
 }
 
-function getCurrentDate() {
-  return new Date().toISOString().split("T")[0];
+function extractTableData(table, targetArray, isCore = false, filter = "all") {
+  if (!table) return;
+  table.querySelectorAll("tbody tr").forEach(row => {
+    const cells = row.querySelectorAll("td");
+    if (!cells.length) return;
+
+    let nameCell = cells[isCore ? 0 : 1];
+    let { machine, human } = extractModuleNames(nameCell);
+
+    let from = cleanVersion(cleanText(cells[isCore ? 1 : 2]?.textContent || ""));
+    let to = cleanVersion(cleanText(cells[isCore ? 2 : 3]?.textContent || ""));
+
+    const isExcluded = isModuleExcluded(machine, human);
+
+    if ((filter === "excluded" && !isExcluded) || (filter !== "excluded" && isExcluded)) return;
+
+    if (machine && human && from && to && from !== to) {
+      targetArray.push([machine, human, from, to]);
+    }
+  });
 }
 
-function quoteCSV(val) {
-  const str = String(val).replace(/\r?\n/g, "\n"); // Normalize newlines
-  const escaped = str.replace(/"/g, '""');         // Escape quotes
-  return `"${escaped}"`;
+function generateCSV(all) {
+  const rows = [["Module Name", "Installed Version", "Recommended Version"], ...all.map(r => [r[1], r[2], r[3]])];
+  const csvContent = rows.map(row => row.map(escapeCSVValue).join(",")).join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `drupal-updates-${new Date().toISOString().split("T")[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  console.log("✅ CSV report downloaded successfully.");
 }
 
 function generateUpdateReport(action = "csv", filter = "all") {
-    let core = [], contrib = [], excludedModulesList = [];
-    let securityOnly = filter === "security";
-    let excludedOnly = filter === "excluded";
+  let core = [], contrib = [];
+  extractTableData(document.querySelector("#edit-manual-updates"), core, true, filter);
+  extractTableData(document.querySelector("#edit-projects, .update"), contrib, false, filter);
 
-    function extractTableData(table, targetArray, isCore = false) {
-        if (!table) return;
-        table.querySelectorAll("tbody tr").forEach(row => {
-            const cells = row.querySelectorAll("td");
-            if (!cells.length) return;
+  const all = [...core, ...contrib];
+  if (!all.length) return console.log("⚠️ No updates found.");
 
-            let nameCell = cells[isCore ? 0 : 1];
-            let { machine, human } = extractModuleNames(nameCell);
-
-            let from = cleanVersion(cleanText(cells[isCore ? 1 : 2]?.textContent || ""));
-            let to = cleanVersion(cleanText(cells[isCore ? 2 : 3]?.textContent || ""));
-
-            const isExcluded = excludedModules.has(machine) || excludedModules.has(human.toLowerCase());
-            if (isExcluded && !excludedOnly) return; // Skip excluded if not specifically requesting them
-
-            if (machine && human && from && to && from !== to) {
-                if (isExcluded) {
-                    excludedModulesList.push([human, from, to]);
-                } else {
-                    targetArray.push([machine, human, from, to]);
-                }
-            }
-        });
-    }
-
-    extractTableData(document.querySelector("table#edit-manual-updates"), core, true);
-    extractTableData(document.querySelector("table#edit-projects") || document.querySelector("table.update"), contrib, false);
-
-    if (excludedOnly && excludedModulesList.length === 0) {
-        console.log("⚠️ No excluded modules found.");
-        return;
-    }
-
-    const HEADERS = ["Module Name", "Installed Version", "Recommended Version"];
-    let all = [...core, ...contrib];
-
-    if (action === "csv") {
-        let rows = [HEADERS, ...all.map(r => [r[1], r[2], r[3]])];
-        let csvContent = rows.map(row => row.map(quoteCSV).join(",")).join("\n");
-        
-        let blob = new Blob([csvContent], { type: "text/csv" });
-        let a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `drupal-updates-${getCurrentDate()}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-
-        console.log("\n✅ CSV report downloaded successfully.");
-    } else if (action === "ascii") {
-        let widths = HEADERS.map((h, i) => Math.max(h.length, ...all.map(r => r[i].length), ...excludedModulesList.map(r => r[i].length)));
-        let row = r => `| ${r.map((c, i) => c.padEnd(widths[i])).join(" | ")} |`;
-        let bar = ch => `+${widths.map(w => ch.repeat(w + 2)).join("+")}+`;
-
-        console.log(`\n${bar("-")}\n${row(HEADERS)}\n${bar("=")}\n${all.map(row).join("\n")}\n${bar("-")}\n`);
-
-        if (excludedModulesList.length) {
-            console.log(`\n🚫 Excluded Modules (ASCII):\n`);
-            console.log(`${bar("-")}\n${row(HEADERS)}\n${bar("=")}\n${excludedModulesList.map(row).join("\n")}\n${bar("-")}\n`);
-        }
-    }
-
-    return;
+  if (action === "csv") generateCSV(all);
 }
 
-// Run once immediately to confirm it's loaded
-generateUpdateReport("help");
+// Default action to download a CSV report
+generateUpdateReport("csv");
