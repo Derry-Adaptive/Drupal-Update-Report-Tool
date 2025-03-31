@@ -43,170 +43,73 @@ function quoteCSV(val) {
 }
 
 function generateUpdateReport(action = "csv", filter = "all") {
-  if (action === "help") {
- console.log(`
-🔧 generateUpdateReport([type], [scope]) — Drupal Module Update Helper
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    let core = [], contrib = [], excludedModulesList = [];
+    let securityOnly = filter === "security";
+    let excludedOnly = filter === "excluded";
 
-📦 TYPE (output format)
-  "csv"         → Download a CSV file of available updates
-  "ascii"       → Output a clean table to the console
-  "commit"      → Print commit message summary
-  "composer"    → Output a 'composer require' command
+    function extractTableData(table, targetArray, isCore = false) {
+        if (!table) return;
+        table.querySelectorAll("tbody tr").forEach(row => {
+            const cells = row.querySelectorAll("td");
+            if (!cells.length) return;
 
-🎯 SCOPE (optional filter)
-  "all"         → Include all available updates (default)
-  "security"    → Limit output to security updates only
+            let nameCell = cells[isCore ? 0 : 1];
+            let { machine, human } = extractModuleNames(nameCell);
 
-📌 USAGE
-  generateUpdateReport("ascii")                  → All updates
-  generateUpdateReport("csv", "security")        → Security-only CSV
-  generateUpdateReport("composer")               → Composer command for all
+            let from = cleanVersion(cleanText(cells[isCore ? 1 : 2]?.textContent || ""));
+            let to = cleanVersion(cleanText(cells[isCore ? 2 : 3]?.textContent || ""));
 
-🚫 EXCLUDE MODULES
-  generateUpdateReport("add_exclude", "token")      → Exclude modules matching "token"
-  generateUpdateReport("add_exclude", "admin")      → Match by part of name or project URL
-  generateUpdateReport("remove_exclude", "admin")   → Remove exclusion
-  generateUpdateReport("exclude_list")              → View current exclude filters
+            const isExcluded = excludedModules.has(machine) || excludedModules.has(human.toLowerCase());
+            if (isExcluded && !excludedOnly) return; // Skip excluded if not specifically requesting them
 
-💡 TIPS
-  • Excludes match module name and drupal.org/project/* path (case-insensitive)
-  • Partial names and patterns like "media", "admin", "views" are supported
-  • Filters are stored only in memory (browser tab session)
-  • Run after exclusions: generateUpdateReport("ascii") or ("composer")
+            if (machine && human && from && to && from !== to) {
+                if (isExcluded) {
+                    excludedModulesList.push([human, from, to]);
+                } else {
+                    targetArray.push([machine, human, from, to]);
+                }
+            }
+        });
+    }
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-`);
-    return;
-  }
+    extractTableData(document.querySelector("table#edit-manual-updates"), core, true);
+    extractTableData(document.querySelector("table#edit-projects") || document.querySelector("table.update"), contrib, false);
 
-  if (action === "exclude_list") {
-    console.log([...excludedModules].map(name => `- ${name}`).join("\n") || "None");
-    return;
-  }
+    if (excludedOnly && excludedModulesList.length === 0) {
+        console.log("⚠️ No excluded modules found.");
+        return;
+    }
 
-  if (action === "add_exclude") {
-    const pattern = filter.toLowerCase().trim();
-    excludedModules.add(pattern);
-    console.log(`✅ Added to exclude list: ${pattern}`);
-    return;
-  }
+    const HEADERS = ["Module Name", "Installed Version", "Recommended Version"];
+    let all = [...core, ...contrib];
 
-  if (action === "remove_exclude") {
-    excludedModules.delete(filter.toLowerCase().trim());
-    console.log(`✅ Removed from exclude list: ${filter}`);
-    return;
-  }
+    if (action === "csv") {
+        let rows = [HEADERS, ...all.map(r => [r[1], r[2], r[3]])];
+        let csvContent = rows.map(row => row.map(quoteCSV).join(",")).join("\n");
+        
+        let blob = new Blob([csvContent], { type: "text/csv" });
+        let a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `drupal-updates-${getCurrentDate()}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
 
-  function extractTableData(table, targetArray, isCore = false, securityOnly = false) {
-    if (!table) return;
-    table.querySelectorAll("tbody tr").forEach(row => {
-      const cells = row.querySelectorAll("td");
-      if (!cells.length) return;
+        console.log("\n✅ CSV report downloaded successfully.");
+    } else if (action === "ascii") {
+        let widths = HEADERS.map((h, i) => Math.max(h.length, ...all.map(r => r[i].length), ...excludedModulesList.map(r => r[i].length)));
+        let row = r => `| ${r.map((c, i) => c.padEnd(widths[i])).join(" | ")} |`;
+        let bar = ch => `+${widths.map(w => ch.repeat(w + 2)).join("+")}+`;
 
-      let nameCell = cells[isCore ? 0 : 1];
-      let { machine, human } = extractModuleNames(nameCell);
+        console.log(`\n${bar("-")}\n${row(HEADERS)}\n${bar("=")}\n${all.map(row).join("\n")}\n${bar("-")}\n`);
 
-      let from = cleanVersion(cleanText(cells[isCore ? 1 : 2]?.textContent || ""));
-      let to = cleanVersion(cleanText(cells[isCore ? 2 : 3]?.textContent || ""));
-
-      const isExcluded = [...excludedModules].some(pattern => {
-        const normPattern = pattern.toLowerCase();
-        const normMachine = machine.toLowerCase();
-        if (normPattern.includes("*")) {
-          const regex = new RegExp("^" + normPattern.replace(/\*/g, ".*") + "$");
-          return regex.test(normMachine) || regex.test(`drupal/${normMachine}`);
+        if (excludedModulesList.length) {
+            console.log(`\n🚫 Excluded Modules (ASCII):\n`);
+            console.log(`${bar("-")}\n${row(HEADERS)}\n${bar("=")}\n${excludedModulesList.map(row).join("\n")}\n${bar("-")}\n`);
         }
-        return normMachine === normPattern || `drupal/${normMachine}` === normPattern;
-      });
-
-      if (isExcluded) return;
-
-      if (machine && human && from && to && from !== to) {
-        targetArray.push([machine, human, from, to]);
-      }
-    });
-  }
-
-  function exportCSV(core, contrib) {
-    let rows = [
-      ["Module Name", "Installed Version", "Recommended Version"],
-      ...core.map(r => [r[1], r[2], r[3]]),
-      ...contrib.map(r => [r[1], r[2], r[3]])
-    ];
-    let csv = rows.map(r => r.map(quoteCSV).join(",")).join("\n");
-    let blob = new Blob([csv], { type: "text/csv" });
-    let a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `drupal updates - ${window.location.hostname} - ${getCurrentDate()}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }
-
-  function formatAsciiTable(core, contrib) {
-    let all = [...core, ...contrib].map(r => [r[1], r[2], r[3]]);
-    if (!all.length) {
-      console.log("No updates found.");
-      return;
     }
 
-    let widths = HEADERS.map((h, i) => Math.max(h.length, ...all.map(r => r[i].length)));
-    let row = r => `| ${r.map((c, i) => c.padEnd(widths[i])).join(" | ")} |`;
-    let bar = ch => `+${widths.map(w => ch.repeat(w + 2)).join("+")}+`;
-
-    console.log(`\n${bar("-")}\n${row(HEADERS)}\n${bar("=")}\n${all.map(row).join("\n")}\n${bar("-")}\n`);
-  }
-
-  function formatCommitMessage(core, contrib) {
-    return `Update Drupal modules (${getCurrentDate()})\n\n` +
-      (core.length ? "Core updates:\n" + core.map(r => `- ${r[1]} (${r[2]} → ${r[3]})`).join("\n") + "\n\n" : "") +
-      (contrib.length ? "Contrib module updates:\n" + contrib.map(r => `- ${r[1]} (${r[2]} → ${r[3]})`).join("\n") : "");
-  }
-
-  let core = [], contrib = [], securityOnly = filter === "security";
-
-  extractTableData(document.querySelector("table#edit-manual-updates"), core, true, securityOnly);
-  extractTableData(document.querySelector("table#edit-projects") || document.querySelector("table.update"), contrib, false, securityOnly);
-
-  if (action === "composer") {
-    let lines = [];
-
-    core.forEach(([m, h, f, t]) => {
-      if (m === "core" || h.toLowerCase().includes("drupal core")) {
-        lines.push(
-          `drupal/core-recommended:^${t}`,
-          `drupal/core-composer-scaffold:^${t}`,
-          `drupal/core-project-message:^${t}`
-        );
-      }
-    });
-
-    contrib.forEach(([m, h, f, t]) => {
-      lines.push(/[^a-z0-9_]/.test(m) ? `"drupal/${m}:^${t}"` : `drupal/${m}:^${t}`);
-    });
-
-    if (lines.length) {
-      console.log("📦 Composer command:");
-      console.log("composer require -W " + lines.join(" "));
-    } else {
-      console.log("⚠️ No matching modules found.");
-    }
     return;
-  }
-
-  if (action === "commit") {
-    console.log("\n=== Commit Message ===\n");
-    console.log(formatCommitMessage(core, contrib));
-  } else if (action === "ascii") {
-    console.log("\n=== ASCII Table ===\n");
-    formatAsciiTable(core, contrib);
-  } else if (action === "csv") {
-    console.log("\n✅ CSV will be downloaded automatically.");
-    exportCSV(core, contrib);
-  } else {
-    console.log("❌ Unknown command. Use generateUpdateReport('help') for usage.");
-  }
 }
 
 // Run once immediately to confirm it's loaded
