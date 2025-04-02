@@ -1,1 +1,133 @@
-javascript:(function(){if(!window._excludedModules)window._excludedModules=new Set();const excludedModules=window._excludedModules;function cleanText(text){return text?text.replace(/<a[^>]*>|<\/a>/g,"").replace(/\(Release notes\)/gi,"").replace(/\s+/g," ").trim():""}function cleanVersion(version){return version.replace(/^8\.x-/,"").trim()}function escapeCSVValue(value){if(!value)return'""';const str=String(value).replace(/"/g,'""');return`"${str}"`}function isModuleExcluded(machine,human){const lowerHuman=human.toLowerCase();for(let pattern of excludedModules){if(pattern.includes("*")){const regex=new RegExp(pattern.replace(/\*/g,".*"),"i");if(regex.test(machine)||regex.test(lowerHuman))return!0}else if(pattern===machine||pattern===lowerHuman)return!0}return!1}function extractModuleNames(cell){if(!cell)return{machine:"",human:""};const link=cell.querySelector("a[href*='drupal.org/project/']");let machine="";if(link){const match=link.getAttribute("href").match(/project\/([^/]+)/);if(match)machine=match[1].toLowerCase()}let tempCell=cell.cloneNode(!0);tempCell.querySelectorAll("div").forEach(div=>div.remove());let human=cleanText(tempCell.textContent);return{machine,human}}function extractTableData(table,targetArray,isCore=!1,filter="all"){if(!table)return;table.querySelectorAll("tbody tr").forEach(row=>{const cells=row.querySelectorAll("td");if(!cells.length)return;let nameCell=cells[isCore?0:1],{machine,human}=extractModuleNames(nameCell),from=cleanVersion(cleanText(cells[isCore?1:2]?.textContent||"")),to=cleanVersion(cleanText(cells[isCore?2:3]?.textContent||"")),isExcluded=isModuleExcluded(machine,human);if("excluded"===filter&&!isExcluded||"excluded"!==filter&&isExcluded)return;if(machine&&human&&from&&to&&from!==to)targetArray.push([machine,human,from,to])})}function generateCSV(all){const rows=[["Module Name","Installed Version","Recommended Version"],...all.map(r=>[r[1],r[2],r[3]])],csvContent=rows.map(row=>row.map(escapeCSVValue).join(",")).join("\n"),blob=new Blob([csvContent],{type:"text/csv"}),a=document.createElement("a");a.href=URL.createObjectURL(blob),a.download=`drupal-updates-${new Date().toISOString().split("T")[0]}.csv`,document.body.appendChild(a),a.click(),document.body.removeChild(a),console.log("✅ CSV report downloaded successfully.")}window.generateUpdateReport=function(action="csv",filter="all"){if("help"===action){console.log(`\n🔧 generateUpdateReport([type], [scope]) — Drupal Module Update Helper\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n📦 TYPE (output format)\n  "csv"         → Download a CSV file of available updates\n  "ascii"       → Output a clean table to the console\n  "commit"      → Print commit message summary\n  "composer"    → Output a 'composer require' command\n\n🎯 SCOPE (optional filter)\n  "all"         → Include all available updates (default)\n  "security"    → Limit output to security updates only\n  "excluded"    → Only show modules marked as excluded\n\n📌 USAGE\n  generateUpdateReport("ascii")                  → All updates\n  generateUpdateReport("csv", "security")        → Security-only CSV\n  generateUpdateReport("composer")               → Composer command for all\n\n🚫 EXCLUDE MODULES\n  generateUpdateReport("add_exclude", "token")      → Exclude modules matching "token"\n  generateUpdateReport("add_exclude", "admin")      → Match by part of name or project URL\n  generateUpdateReport("remove_exclude", "admin")   → Remove exclusion\n  generateUpdateReport("exclude_list")              → View current exclude filters\n\n💡 TIPS\n  • Excludes match module name and drupal.org/project/* path (case-insensitive)\n  • Partial names and patterns like "media", "admin", "views" are supported\n  • Filters are stored only in memory (browser tab session)\n  • Run after exclusions: generateUpdateReport("ascii") or ("composer")\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);return}let core=[],contrib=[];extractTableData(document.querySelector("#edit-manual-updates"),core,!0,filter);extractTableData(document.querySelector("#edit-projects, .update"),contrib,!1,filter);const all=[...core,...contrib];if(!all.length)return console.log("⚠️ No updates found.");"csv"===action&&generateCSV(all)};generateUpdateReport("help")})();
+javascript:(function(){
+  const HEADERS = ["Module Name","Installed Version","Recommended Version"];
+  const excludedModules = window._excludedModules || new Set();
+  window._excludedModules = excludedModules;
+
+  function cleanText(text){
+    return text.replace(/<a[^>]*>|<\/a>/g,"").replace(/\(Release notes\)/gi,"").replace(/\s+/g," ").trim();
+  }
+
+  function cleanVersion(version){
+    return version.replace(/^8\.x-/,"");
+  }
+
+  function extractModuleNames(cell){
+    if(!cell) return {machine: "", human: ""};
+    const link = cell.querySelector("a[href*='drupal.org/project/']");
+    let machine = "";
+    if(link){
+      const match = link.getAttribute("href").match(/project\/([^/]+)/);
+      if(match) machine = match[1].toLowerCase();
+    }
+    let tempCell = cell.cloneNode(true);
+    tempCell.querySelectorAll("div").forEach(div => div.remove());
+    let human = cleanText(tempCell.textContent);
+    return {machine, human};
+  }
+
+  function getCurrentDate(){
+    return new Date().toISOString().split("T")[0];
+  }
+
+  function quoteCSV(val){
+    val = String(val);
+    val = val.replace(/"/g, '""');
+    if (/["\n\r,]/.test(val)) {
+      return `"${val}"`;
+    }
+    return val;
+  }
+
+  function exportCSV(core, contrib){
+    let rows = [["Module Name", "Installed Version", "Recommended Version"], ...core.map(r => [r[1], r[2], r[3]]), ...contrib.map(r => [r[1], r[2], r[3]])];
+    let csv = rows.map(r => r.map(quoteCSV).join(",")).join("\n");
+    let blob = new Blob([csv], {type: "text/csv"});
+    let a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `drupal updates - ${window.location.hostname} - ${getCurrentDate()}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+
+  function generateComposerCommand(core, contrib){
+    let lines = [];
+    let coreDetected = false;
+
+    core.forEach(([m, h, f, t]) => {
+      if (m === "core" || h.toLowerCase().includes("drupal core")) {
+        coreDetected = true;
+        lines.push(
+          `drupal/core-recommended:^${t}`,
+          `drupal/core-composer-scaffold:^${t}`,
+          `drupal/core-project-message:^${t}`,
+          `drupal/core:^${t}`
+        );
+      }
+    });
+
+    contrib.forEach(([m, h, f, t]) => {
+      lines.push(/[^a-z0-9_]/.test(m) ? `"drupal/${m}:^${t}"` : `drupal/${m}:^${t}`);
+    });
+
+    if(lines.length){
+      console.log("📦 Composer command:");
+      console.log("composer require -W " + lines.join(" "));
+    } else {
+      console.log("⚠️ No matching modules found.");
+    }
+  }
+
+  function generateUpdateReport(action = "help", filter = "all"){
+    if(action === "help"){
+      console.log('✅ "generateUpdateReport" is ready to use');
+      console.log('📦 REPORT OUTPUT OPTIONS:');
+      console.log('🔹 generateUpdateReport(); → CSV of all updates (default)');
+      console.log('🔹 generateUpdateReport("csv", "security"); → CSV of security updates only');
+      console.log('🔹 generateUpdateReport("ascii"); → Display updates in an ASCII table');
+      console.log('🔹 generateUpdateReport("commit"); → Generate commit message');
+      console.log('🔹 generateUpdateReport("composer"); → Generate composer require command');
+      console.log('🔹 generateUpdateReport("all"); → Test all output formats');
+      
+      console.log('🧰 EXCLUDE / UNLOAD OPTIONS:');
+      console.log('🔹 generateUpdateReport("add_exclude", "module_name"); → Add a module to the exclude list');
+      console.log('🔹 generateUpdateReport("remove_exclude", "module_name"); → Remove a module from the exclude list');
+      console.log('🔹 generateUpdateReport("exclude_list"); → Display all excluded modules');
+      return;
+    }
+
+    let core = [], contrib = [];
+    
+    function extractTableData(table, targetArray, isCore = false){
+      if(!table) return;
+      table.querySelectorAll("tbody tr").forEach(row => {
+        const cells = row.querySelectorAll("td");
+        if(!cells.length) return;
+
+        if(isCore) {
+          let from = cleanVersion(cleanText(cells[1]?.textContent || ""));
+          let to = cleanVersion(cleanText(cells[2]?.textContent || ""));
+          if(from && to && from !== to) targetArray.push(["core", "Drupal Core", from, to]);
+        } else {
+          let {machine, human} = extractModuleNames(cells[1]);
+          let from = cleanVersion(cleanText(cells[2]?.textContent || ""));
+          let to = cleanVersion(cleanText(cells[3]?.textContent || ""));
+          if(excludedModules.has(machine.toLowerCase())) return;
+          if(machine && human && from && to && from !== to) targetArray.push([machine, human, from, to]);
+        }
+      });
+    }
+
+    extractTableData(document.querySelector("table#edit-manual-updates"), core, true);
+    extractTableData(document.querySelector("table#edit-projects") || document.querySelector("table.update"), contrib, false);
+
+    if(action === "composer") generateComposerCommand(core, contrib);
+    else if(action === "csv") exportCSV(core, contrib);
+    else if(action === "all"){
+      generateUpdateReport("composer");
+      generateUpdateReport("csv");
+      generateUpdateReport("help");
+    }
+  }
+
+  window.generateUpdateReport = generateUpdateReport;
+  generateUpdateReport("help");
+})();
