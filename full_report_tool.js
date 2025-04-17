@@ -227,7 +227,13 @@ function generateUpdateReport(action = "help", filter = "all") {
 
   extractTableData(document.querySelector("table#edit-manual-updates"), core, true);
   extractTableData(document.querySelector("table#edit-projects") || document.querySelector("table.update"), contrib, false);
+  const allowedFilters = ["all", "security", "unsupported"];
+  const activeFilter = allowedFilters.includes(filter?.toLowerCase()) ? filter.toLowerCase() : "all";
 
+  if (activeFilter !== "all") {
+    core = core.filter(r => r[1].toLowerCase().includes(activeFilter));
+    contrib = contrib.filter(r => r[1].toLowerCase().includes(activeFilter));
+  }
   if (action === "composer") generateComposerCommand(core, contrib);
   else if (action === "csv") exportCSV(core, contrib);
   else if (action === "commit") generateCommitMessage(core, contrib);
