@@ -1,14 +1,31 @@
 javascript:(function(){
-  const HEADERS = ["Module Name", "Installed Version", "Recommended Version"];
+const MODULE_UPDATE_HEADERS = [
+  "Module Name",
+  "Installed Version",
+  "Recommended Version"
+];
+
 const excludedModules = window._excludedModules || new Set();
 window._excludedModules = excludedModules;
 
+// 🔧 Helpers
 function cleanText(text) {
   return text.replace(/<a[^>]*>|<\/a>/g, "").replace(/\(Release notes\)/gi, "").replace(/\s+/g, " ").trim();
 }
 
 function cleanVersion(version) {
   return version.replace(/^8\.x-/, "");
+}
+
+function getCleanTextFromCell(cell) {
+  if (!cell) return "";
+  const clone = cell.cloneNode(true);
+  clone.querySelectorAll("div").forEach(div => div.remove());
+  return cleanText(clone.textContent);
+}
+
+function getVersion(cell) {
+  return cleanVersion(cleanText(cell?.textContent || ""));
 }
 
 function extractModuleNames(cell) {
@@ -19,9 +36,7 @@ function extractModuleNames(cell) {
     const match = link.getAttribute("href").match(/project\/([^/]+)/);
     if (match) machine = match[1].toLowerCase();
   }
-  let tempCell = cell.cloneNode(true);
-  tempCell.querySelectorAll("div").forEach(div => div.remove());
-  let human = cleanText(tempCell.textContent);
+  const human = getCleanTextFromCell(cell);
   return { machine, human };
 }
 
@@ -30,19 +45,19 @@ function getCurrentDate() {
 }
 
 function quoteCSV(val) {
-  val = String(val);
-  val = val.replace(/"/g, '""');
-  if (/["\n\r,]/.test(val)) {
-    return `"${val}"`;
-  }
-  return val;
+  val = String(val).replace(/"/g, '""');
+  return /["\n\r,]/.test(val) ? `"${val}"` : val;
 }
 
 function exportCSV(core, contrib) {
-  let rows = [["Module Name", "Installed Version", "Recommended Version"], ...core.map(r => [r[1], r[2], r[3]]), ...contrib.map(r => [r[1], r[2], r[3]])];
-  let csv = rows.map(r => r.map(quoteCSV).join(",")).join("\n");
-  let blob = new Blob([csv], { type: "text/csv" });
-  let a = document.createElement("a");
+  const rows = [
+    MODULE_UPDATE_HEADERS,
+    ...core.map(r => [r[1], r[2], r[3]]),
+    ...contrib.map(r => [r[1], r[2], r[3]])
+  ];
+  const csv = rows.map(r => r.map(quoteCSV).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = `drupal updates - ${window.location.hostname} - ${getCurrentDate()}.csv`;
   document.body.appendChild(a);
@@ -51,12 +66,10 @@ function exportCSV(core, contrib) {
 }
 
 function generateComposerCommand(core, contrib) {
-  let lines = [];
-  let coreDetected = false;
+  const lines = [];
 
   core.forEach(([m, h, f, t]) => {
     if (m === "core" || h.toLowerCase().includes("drupal core")) {
-      coreDetected = true;
       lines.push(
         `drupal/core-recommended:^${t}`,
         `drupal/core-composer-scaffold:^${t}`,
@@ -77,6 +90,7 @@ function generateComposerCommand(core, contrib) {
     console.log("⚠️ No matching modules found.");
   }
 }
+
 function generateAsciiTable(core, contrib) {
   const all = [...core, ...contrib];
   if (!all.length) {
@@ -85,7 +99,7 @@ function generateAsciiTable(core, contrib) {
   }
 
   const rows = [
-    ["Module Name", "Installed Version", "Recommended Version"],
+    MODULE_UPDATE_HEADERS,
     ...all.map(([_, human, from, to]) => [human, from, to])
   ];
 
@@ -97,9 +111,7 @@ function generateAsciiTable(core, contrib) {
   });
 
   function makeLine(sepLeft, sepMid, sepRight, fill = '-') {
-    return sepLeft +
-      colWidths.map(w => fill.repeat(w + 2)).join(sepMid) +
-      sepRight;
+    return sepLeft + colWidths.map(w => fill.repeat(w + 2)).join(sepMid) + sepRight;
   }
 
   function formatRow(row) {
@@ -124,6 +136,7 @@ function generateAsciiTable(core, contrib) {
   console.log("📋 ASCII table output:\n");
   console.log(output.join("\n"));
 }
+
 function generateCommitMessage(core, contrib) {
   const date = getCurrentDate();
   const lines = [`Update Drupal modules (${date})`];
@@ -153,15 +166,14 @@ function generateCommitMessage(core, contrib) {
 function generateUpdateReport(action = "help", filter = "all") {
   if (action === "help") {
     console.log('✅ "generateUpdateReport" is ready to use');
-    console.log('📦 REPORT OUTPUT OPTIONS:');
+    console.log('📦 REPORT OUTPUT OPTIONS:\n');
     console.log('🔹 generateUpdateReport(); → CSV of all updates (default)');
     console.log('🔹 generateUpdateReport("csv", "security"); → CSV of security updates only');
     console.log('🔹 generateUpdateReport("ascii"); → Display updates in an ASCII table');
     console.log('🔹 generateUpdateReport("commit"); → Generate commit message');
     console.log('🔹 generateUpdateReport("composer"); → Generate composer require command');
     console.log('🔹 generateUpdateReport("all"); → Test all output formats');
-    console.log('');
-    console.log('🧰 EXCLUDE / UNLOAD OPTIONS:');
+    console.log('\n🧰 EXCLUDE / UNLOAD OPTIONS:\n');
     console.log('🔹 generateUpdateReport("add_exclude", "module_name"); → Add a module to the exclude list');
     console.log('🔹 generateUpdateReport("remove_exclude", "module_name"); → Remove a module from the exclude list');
     console.log('🔹 generateUpdateReport("exclude_list"); → Display all excluded modules');
@@ -190,18 +202,22 @@ function generateUpdateReport(action = "help", filter = "all") {
 
   function extractTableData(table, targetArray, isCore = false) {
     if (!table) return;
+
     table.querySelectorAll("tbody tr").forEach(row => {
       const cells = row.querySelectorAll("td");
       if (!cells.length) return;
 
       if (isCore) {
-        let from = cleanVersion(cleanText(cells[1]?.textContent || ""));
-        let to = cleanVersion(cleanText(cells[2]?.textContent || ""));
-        if (from && to && from !== to) targetArray.push(["core", "Drupal Core", from, to]);
+        const label = getCleanTextFromCell(cells[0]);
+        const from = getVersion(cells[1]);
+        const to = getVersion(cells[2]);
+        if (from && to && from !== to) {
+          targetArray.push(["core", label, from, to]);
+        }
       } else {
-        let { machine, human } = extractModuleNames(cells[1]);
-        let from = cleanVersion(cleanText(cells[2]?.textContent || ""));
-        let to = cleanVersion(cleanText(cells[3]?.textContent || ""));
+        const { machine, human } = extractModuleNames(cells[1]);
+        const from = getVersion(cells[2]);
+        const to = getVersion(cells[3]);
         if (excludedModules.has(machine.toLowerCase())) return;
         if (machine && human && from && to && from !== to) {
           targetArray.push([machine, human, from, to]);
