@@ -141,14 +141,14 @@ function generateCommitMessage(core, contrib) {
   const lines = [`Update Drupal modules (${date})`];
 
   if (core.length) {
-    lines.push("\nCore updates:\n");
+    lines.push("\nCore updates:");
     core.forEach(([_, human, from, to]) => {
       lines.push(`${human} (${from} → ${to})`);
     });
   }
 
   if (contrib.length) {
-    lines.push("\nContrib module updates:\n");
+    lines.push("\nContrib module updates:");
     contrib.forEach(([_, human, from, to]) => {
       lines.push(`${human} (${from} → ${to})`);
     });
@@ -163,12 +163,13 @@ function generateCommitMessage(core, contrib) {
 }
 
 function generateUpdateReport(action = "help", filter = "all") {
-  if (action === "help") {
+  if (action === "help" || !action) {
     console.log('✅ "generateUpdateReport" is ready to use');
     console.log('📦 REPORT OUTPUT OPTIONS:\n');
-    console.log('🔹 generateUpdateReport(); → CSV of all updates (default)');
+    console.log('🔹 generateUpdateReport("csv"); → CSV of all updates');
     console.log('🔹 generateUpdateReport("csv", "security"); → CSV of security updates only');
     console.log('🔹 generateUpdateReport("ascii"); → Display updates in an ASCII table');
+    console.log('🔹 generateUpdateReport("jira"); → Generate Jira-compatible table with test site URL');
     console.log('🔹 generateUpdateReport("commit"); → Generate commit message');
     console.log('🔹 generateUpdateReport("composer"); → Generate composer require command');
     console.log('🔹 generateUpdateReport("all"); → Test all output formats');
@@ -179,6 +180,8 @@ function generateUpdateReport(action = "help", filter = "all") {
     return;
   }
 
+  // Rest of the function remains the same...
+  
   if (action === "add_exclude") {
     excludedModules.add(filter.toLowerCase());
     console.log(`🛑 Excluded module: ${filter}`);
@@ -238,14 +241,81 @@ function generateUpdateReport(action = "help", filter = "all") {
   else if (action === "csv") exportCSV(core, contrib);
   else if (action === "commit") generateCommitMessage(core, contrib);
   else if (action === "ascii") generateAsciiTable(core, contrib);
+  else if (action === "jira") {
+    const testSiteUrl = prompt("Enter test site URL:", "https://test.example.com");
+    generateJiraTable(core, contrib, testSiteUrl);
+  }
   else if (action === "all") {
     generateUpdateReport("composer");
     generateUpdateReport("csv");
     generateUpdateReport("ascii");
+    generateUpdateReport("jira");
     generateUpdateReport("commit");
     generateUpdateReport("help");
   }
 }
 
 window.generateUpdateReport = generateUpdateReport;
+
+function generateJiraTable(core, contrib, testSiteUrl = "https://test.example.com") {
+  const all = [...core, ...contrib];
+  if (!all.length) {
+    console.log("⚠️ No module updates to display in Jira table.");
+    return;
+  }
+
+  const colWidths = [0, 0, 0];
+  const rows = [MODULE_UPDATE_HEADERS];
+
+  // Calculate column widths
+  const allRows = [
+    ...core.map(([_, human, from, to]) => [human, from, to]),
+    ...contrib.map(([_, human, from, to]) => [human, from, to])
+  ];
+  [...rows, ...allRows].forEach(row => {
+    row.forEach((cell, i) => {
+      colWidths[i] = Math.max(colWidths[i], cell.length);
+    });
+  });
+
+  // Generate table with Jira markup
+  const date = getCurrentDate();
+  const output = [
+    `h3. Module updates report`,
+    `Test site: ${testSiteUrl}`,
+    `Date: ${date}`,
+    '' // Empty line before table
+  ];
+
+  // Header row
+  output.push(
+    `||${MODULE_UPDATE_HEADERS[0].padEnd(colWidths[0])}||${MODULE_UPDATE_HEADERS[1].padEnd(colWidths[1])}||${MODULE_UPDATE_HEADERS[2].padEnd(colWidths[2])}||`
+  );
+
+  // Core updates
+  if (core.length) {
+    output.push(`||Core Updates${' '.repeat(colWidths[0] - 11)}||${' '.repeat(colWidths[1])}||${' '.repeat(colWidths[2])}||`);
+    core.forEach(([_, human, from, to]) => {
+      output.push(`|${human.padEnd(colWidths[0])}|${from.padEnd(colWidths[1])}|${to.padEnd(colWidths[2])}|`);
+    });
+  }
+
+  // Contrib updates
+  if (contrib.length) {
+    output.push(`||Contrib Updates${' '.repeat(colWidths[0] - 14)}||${' '.repeat(colWidths[1])}||${' '.repeat(colWidths[2])}||`);
+    contrib.forEach(([_, human, from, to]) => {
+      output.push(`|${human.padEnd(colWidths[0])}|${from.padEnd(colWidths[1])}|${to.padEnd(colWidths[2])}|`);
+    });
+  }
+
+  console.log("📋 Jira table format:\n");
+  console.log(output.join("\n"));
+
+  // Copy to clipboard if supported
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(output.join("\n"))
+      .then(() => console.log("✅ Table copied to clipboard!"))
+      .catch(err => console.log("❌ Could not copy to clipboard:", err));
+  }
+}
 generateUpdateReport("help");
