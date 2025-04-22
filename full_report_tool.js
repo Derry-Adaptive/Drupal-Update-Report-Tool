@@ -267,32 +267,29 @@ function generateJiraTable(core, contrib, testSiteUrl = "https://test.example.co
   const colWidths = [0, 0, 0];
   const rows = [MODULE_UPDATE_HEADERS];
 
-  // Calculate column widths
   const allRows = [
     ...core.map(([_, human, from, to]) => [human, from, to]),
     ...contrib.map(([_, human, from, to]) => [human, from, to])
   ];
+
   [...rows, ...allRows].forEach(row => {
     row.forEach((cell, i) => {
       colWidths[i] = Math.max(colWidths[i], cell.length);
     });
   });
 
-  // Generate table with Jira markup
   const date = getCurrentDate();
   const output = [
     `h3. Module updates report`,
     `Test site: ${testSiteUrl}`,
     `Date: ${date}`,
-    '' // Empty line before table
+    ''
   ];
 
-  // Header row
   output.push(
     `||${MODULE_UPDATE_HEADERS[0].padEnd(colWidths[0])}||${MODULE_UPDATE_HEADERS[1].padEnd(colWidths[1])}||${MODULE_UPDATE_HEADERS[2].padEnd(colWidths[2])}||`
   );
 
-  // Core updates
   if (core.length) {
     output.push(`||Core Updates${' '.repeat(colWidths[0] - 11)}||${' '.repeat(colWidths[1])}||${' '.repeat(colWidths[2])}||`);
     core.forEach(([_, human, from, to]) => {
@@ -300,7 +297,6 @@ function generateJiraTable(core, contrib, testSiteUrl = "https://test.example.co
     });
   }
 
-  // Contrib updates
   if (contrib.length) {
     output.push(`||Contrib Updates${' '.repeat(colWidths[0] - 14)}||${' '.repeat(colWidths[1])}||${' '.repeat(colWidths[2])}||`);
     contrib.forEach(([_, human, from, to]) => {
@@ -310,12 +306,5 @@ function generateJiraTable(core, contrib, testSiteUrl = "https://test.example.co
 
   console.log("📋 Jira table format:\n");
   console.log(output.join("\n"));
-
-  // Copy to clipboard if supported
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(output.join("\n"))
-      .then(() => console.log("✅ Table copied to clipboard!"))
-      .catch(err => console.log("❌ Could not copy to clipboard:", err));
-  }
 }
 generateUpdateReport("help");
