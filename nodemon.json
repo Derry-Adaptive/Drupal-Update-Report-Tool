@@ -1,0 +1,4 @@
+{
+  "ignore": ["bookmarklet.js"],
+  "delay": "2500"
+}

@@ -308,3 +308,9 @@ function generateJiraTable(core, contrib, testSiteUrl = "https://test.example.co
   console.log(output.join("\n"));
 }
 generateUpdateReport("help");
+
+// Add this function to your full_report_tool.js
+function generatePantheonUrl(env = 'dev') {
+  const siteName = window.location.hostname.split('.')[0]; // Extract site name from hostname
+  return `https://${env}-${siteName}.pantheonsite.io`;
+}

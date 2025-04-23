@@ -1,0 +1,21 @@
+{
+  "name": "drupal-update-bookmarklet",
+  "version": "1.0.0",
+  "description": "Generates a bookmarklet from the full report tool code",
+  "main": "bookmarklet_generator.js",
+  "scripts": {
+    "generate": "node bookmarklet_generator.js",
+    "copy": "node -e \"require('clipboardy').writeSync(require('fs').readFileSync('bookmarklet.js', 'utf8'))\"",
+    "build": "npm run generate && npm run copy",
+    "watch": "nodemon bookmarklet_generator.js"
+  },
+  "dependencies": {
+    "uglify-js": "^3.17.4",
+    "clipboardy": "^2.3.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "author": "Your Name",
+  "license": "MIT"
+}
