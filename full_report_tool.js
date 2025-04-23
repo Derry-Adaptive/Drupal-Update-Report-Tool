@@ -1,10 +1,8 @@
-if (typeof window.MODULE_UPDATE_HEADERS === 'undefined') {
-  window.MODULE_UPDATE_HEADERS = [
-    "Module Name",
-    "Installed Version",
-    "Recommended Version"
-  ];
-}
+const MODULE_UPDATE_HEADERS = [
+  "Module Name",
+  "Installed Version",
+  "Recommended Version"
+];
 
 if (typeof window._excludedModules === 'undefined') {
   window._excludedModules = new Set();
@@ -15,9 +13,24 @@ function cleanText(text) {
   return text.replace(/<a[^>]*>|<\/a>/g, "").replace(/\(Release notes\)/gi, "").replace(/\s+/g, " ").trim();
 }
 
-function generatePantheonUrl(env = 'dev') {
-  const siteName = window.location.hostname.split('.')[0];
-  return `https://${env}-${siteName}.pantheonsite.io`;
+function generatePantheonUrl(ticket) {
+    const link = document.querySelector("a.environment-link");
+
+    if (!link) {
+        console.warn("No link with class 'environment-link' found.");
+        return null;
+    }
+
+    const href = link.href;
+
+    if (ticket) {
+        const truncatedTicket = ticket.substring(0, 11); // Truncate to 11 characters
+        // Simple find and replace for the environment segment
+        const envRegex = /^(https?:\/\/)([^.-]+)(.*)/;
+        const newHref = href.replace(envRegex, `$1${truncatedTicket}$3`);
+        return newHref;
+    }
+    return href;
 }
 
 function cleanVersion(version) {
@@ -58,7 +71,7 @@ function quoteCSV(val) {
 
 function exportCSV(core, contrib) {
   const rows = [
-    window.MODULE_UPDATE_HEADERS,
+    MODULE_UPDATE_HEADERS,
     ...core.map(r => [r[1], r[2], r[3]]),
     ...contrib.map(r => [r[1], r[2], r[3]])
   ];
@@ -106,7 +119,7 @@ function generateAsciiTable(core, contrib) {
   }
 
   const rows = [
-    window.MODULE_UPDATE_HEADERS,
+    MODULE_UPDATE_HEADERS,
     ...all.map(([_, human, from, to]) => [human, from, to])
   ];
 
@@ -170,7 +183,10 @@ function generateCommitMessage(core, contrib) {
   }
 }
 
-function generateUpdateReport(action = "help", filter = "all") {
+function generateUpdateReport(action = "help", filter = "all", ticket = null) {
+  // Clear existing excluded modules before processing.
+  excludedModules.clear();
+
   if (action === "help" || !action) {
     console.log('✅ "generateUpdateReport" is ready to use');
     console.log('📦 REPORT OUTPUT OPTIONS:\n');
@@ -249,7 +265,7 @@ function generateUpdateReport(action = "help", filter = "all") {
   else if (action === "commit") generateCommitMessage(core, contrib);
   else if (action === "ascii") generateAsciiTable(core, contrib);
   else if (action === "pantheon") {
-    const pantheonUrl = generatePantheonUrl();
+    const pantheonUrl = generatePantheonUrl(ticket);
     console.log(`🚀 Pantheon URL: ${pantheonUrl}`);
   }
   else if (action === "all") {
@@ -261,5 +277,4 @@ function generateUpdateReport(action = "help", filter = "all") {
   }
 }
 
-window.generateUpdateReport = generateUpdateReport;
 generateUpdateReport("help");
