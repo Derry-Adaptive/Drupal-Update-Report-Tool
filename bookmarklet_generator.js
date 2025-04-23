@@ -7,8 +7,8 @@ const code = fs.readFileSync('full_report_tool.js', 'utf8');
 // Minify the code
 const minified = uglify.minify(code).code;
 
-// Create the bookmarklet code
-const bookmarkletCode = `javascript:${encodeURIComponent(minified)}`;
+// Create the bookmarklet code with IIFE
+const bookmarkletCode = `javascript:(function(){${minified}})()`;
 
 // Write the bookmarklet code to bookmarklet.js
 fs.writeFileSync('bookmarklet.js', bookmarkletCode);

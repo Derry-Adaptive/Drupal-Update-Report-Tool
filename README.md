@@ -3,7 +3,7 @@
 ### 📦 Output Reports (Syntax)
 
 ```js
-generateUpdateReport(type = "{type}", scope = "{scope}", exclude = []);
+generateUpdateReport(type = "{type}", scope = "{scope}", ticket = "{ticket}");
 ```
 
 ### ⚙️ Report Types
@@ -28,6 +28,12 @@ scope =
   "unsupported" // Unsupported updates only
 ```
 
+### 🎫 Pantheon Ticket (Optional)
+
+```js
+ticket = "d1234" // Pantheon ticket number (max 11 chars)
+```
+
 ### 🚫 Exclude Modules (Optional)
 
 ```js
@@ -44,14 +50,11 @@ generateUpdateReport("exclude_list");
 ### 📌 Examples
 
 ```js
-generateUpdateReport("csv", "security", ["module_name1", "module_name2"]);
-// Generates a CSV report of security updates only, excluding module_name1 and module_name2.
+generateUpdateReport("csv", "security");
+// Generates a CSV report of security updates only.
 
-generateUpdateReport("table", "all", ["module_name1"]);
-// Generates an ASCII table report of all available updates, excluding module_name1.
-
-generateUpdateReport("jira", "security");
-// Generates a JIRA table report of security updates only.
+generateUpdateReport("table", "all");
+// Generates an ASCII table report of all available updates.
 
 generateUpdateReport("composer", "all");
 // Generates composer require commands for all available updates.
@@ -62,8 +65,6 @@ generateUpdateReport("modules", "all");
 generateUpdateReport("git", "security");
 // Generates git commit messages for security updates only.
 
-generateUpdateReport("pantheon");
-// Generates a Pantheon URL for the dev environment.
-
-generateUpdateReport("pantheon", "test");
-// Generates a Pantheon URL for the test environment.
+generateUpdateReport("pantheon", "", "d1234");
+// Generates a Pantheon URL for the dev environment with ticket number d1234.
+```
