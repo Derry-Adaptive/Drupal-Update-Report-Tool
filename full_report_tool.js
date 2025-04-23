@@ -1,15 +1,23 @@
-const MODULE_UPDATE_HEADERS = [
-  "Module Name",
-  "Installed Version",
-  "Recommended Version"
-];
+if (typeof window.MODULE_UPDATE_HEADERS === 'undefined') {
+  window.MODULE_UPDATE_HEADERS = [
+    "Module Name",
+    "Installed Version",
+    "Recommended Version"
+  ];
+}
 
-const excludedModules = window._excludedModules || new Set();
-window._excludedModules = excludedModules;
+if (typeof window._excludedModules === 'undefined') {
+  window._excludedModules = new Set();
+}
+var excludedModules = window._excludedModules;
 
-// 🔧 Helpers
 function cleanText(text) {
   return text.replace(/<a[^>]*>|<\/a>/g, "").replace(/\(Release notes\)/gi, "").replace(/\s+/g, " ").trim();
+}
+
+function generatePantheonUrl(env = 'dev') {
+  const siteName = window.location.hostname.split('.')[0];
+  return `https://${env}-${siteName}.pantheonsite.io`;
 }
 
 function cleanVersion(version) {
@@ -50,7 +58,7 @@ function quoteCSV(val) {
 
 function exportCSV(core, contrib) {
   const rows = [
-    MODULE_UPDATE_HEADERS,
+    window.MODULE_UPDATE_HEADERS,
     ...core.map(r => [r[1], r[2], r[3]]),
     ...contrib.map(r => [r[1], r[2], r[3]])
   ];
@@ -98,7 +106,7 @@ function generateAsciiTable(core, contrib) {
   }
 
   const rows = [
-    MODULE_UPDATE_HEADERS,
+    window.MODULE_UPDATE_HEADERS,
     ...all.map(([_, human, from, to]) => [human, from, to])
   ];
 
@@ -169,7 +177,6 @@ function generateUpdateReport(action = "help", filter = "all") {
     console.log('🔹 generateUpdateReport("csv"); → CSV of all updates');
     console.log('🔹 generateUpdateReport("csv", "security"); → CSV of security updates only');
     console.log('🔹 generateUpdateReport("ascii"); → Display updates in an ASCII table');
-    console.log('🔹 generateUpdateReport("jira"); → Generate Jira-compatible table with test site URL');
     console.log('🔹 generateUpdateReport("commit"); → Generate commit message');
     console.log('🔹 generateUpdateReport("composer"); → Generate composer require command');
     console.log('🔹 generateUpdateReport("all"); → Test all output formats');
@@ -180,8 +187,6 @@ function generateUpdateReport(action = "help", filter = "all") {
     return;
   }
 
-  // Rest of the function remains the same...
-  
   if (action === "add_exclude") {
     excludedModules.add(filter.toLowerCase());
     console.log(`🛑 Excluded module: ${filter}`);
@@ -230,6 +235,7 @@ function generateUpdateReport(action = "help", filter = "all") {
 
   extractTableData(document.querySelector("table#edit-manual-updates"), core, true);
   extractTableData(document.querySelector("table#edit-projects") || document.querySelector("table.update"), contrib, false);
+
   const allowedFilters = ["all", "security", "unsupported"];
   const activeFilter = allowedFilters.includes(filter?.toLowerCase()) ? filter.toLowerCase() : "all";
 
@@ -237,80 +243,23 @@ function generateUpdateReport(action = "help", filter = "all") {
     core = core.filter(r => r[1].toLowerCase().includes(activeFilter));
     contrib = contrib.filter(r => r[1].toLowerCase().includes(activeFilter));
   }
+
   if (action === "composer") generateComposerCommand(core, contrib);
   else if (action === "csv") exportCSV(core, contrib);
   else if (action === "commit") generateCommitMessage(core, contrib);
   else if (action === "ascii") generateAsciiTable(core, contrib);
-  else if (action === "jira") {
-    const testSiteUrl = prompt("Enter test site URL:", "https://test.example.com");
-    generateJiraTable(core, contrib, testSiteUrl);
+  else if (action === "pantheon") {
+    const pantheonUrl = generatePantheonUrl();
+    console.log(`🚀 Pantheon URL: ${pantheonUrl}`);
   }
   else if (action === "all") {
     generateUpdateReport("composer");
     generateUpdateReport("csv");
     generateUpdateReport("ascii");
-    generateUpdateReport("jira");
     generateUpdateReport("commit");
     generateUpdateReport("help");
   }
 }
 
 window.generateUpdateReport = generateUpdateReport;
-
-function generateJiraTable(core, contrib, testSiteUrl = "https://test.example.com") {
-  const all = [...core, ...contrib];
-  if (!all.length) {
-    console.log("⚠️ No module updates to display in Jira table.");
-    return;
-  }
-
-  const colWidths = [0, 0, 0];
-  const rows = [MODULE_UPDATE_HEADERS];
-
-  const allRows = [
-    ...core.map(([_, human, from, to]) => [human, from, to]),
-    ...contrib.map(([_, human, from, to]) => [human, from, to])
-  ];
-
-  [...rows, ...allRows].forEach(row => {
-    row.forEach((cell, i) => {
-      colWidths[i] = Math.max(colWidths[i], cell.length);
-    });
-  });
-
-  const date = getCurrentDate();
-  const output = [
-    `h3. Module updates report`,
-    `Test site: ${testSiteUrl}`,
-    `Date: ${date}`,
-    ''
-  ];
-
-  output.push(
-    `||${MODULE_UPDATE_HEADERS[0].padEnd(colWidths[0])}||${MODULE_UPDATE_HEADERS[1].padEnd(colWidths[1])}||${MODULE_UPDATE_HEADERS[2].padEnd(colWidths[2])}||`
-  );
-
-  if (core.length) {
-    output.push(`||Core Updates${' '.repeat(colWidths[0] - 11)}||${' '.repeat(colWidths[1])}||${' '.repeat(colWidths[2])}||`);
-    core.forEach(([_, human, from, to]) => {
-      output.push(`|${human.padEnd(colWidths[0])}|${from.padEnd(colWidths[1])}|${to.padEnd(colWidths[2])}|`);
-    });
-  }
-
-  if (contrib.length) {
-    output.push(`||Contrib Updates${' '.repeat(colWidths[0] - 14)}||${' '.repeat(colWidths[1])}||${' '.repeat(colWidths[2])}||`);
-    contrib.forEach(([_, human, from, to]) => {
-      output.push(`|${human.padEnd(colWidths[0])}|${from.padEnd(colWidths[1])}|${to.padEnd(colWidths[2])}|`);
-    });
-  }
-
-  console.log("📋 Jira table format:\n");
-  console.log(output.join("\n"));
-}
 generateUpdateReport("help");
-
-// Add this function to your full_report_tool.js
-function generatePantheonUrl(env = 'dev') {
-  const siteName = window.location.hostname.split('.')[0]; // Extract site name from hostname
-  return `https://${env}-${siteName}.pantheonsite.io`;
-}

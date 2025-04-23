@@ -12,7 +12,6 @@ generateUpdateReport(type = "{type}", scope = "{scope}", exclude = []);
 type =
   "csv"       // Comma-separated values
   "table"     // ASCII table
-  "jira"      // JIRA table format
   "composer"  // Composer require commands
   "modules"   // Drush commands to enable/uninstall modules
   "git"       // Git commit messages

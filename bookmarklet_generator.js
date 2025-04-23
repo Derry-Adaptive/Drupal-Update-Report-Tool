@@ -1,4 +1,3 @@
-// bookmarklet_generator.js
 const fs = require('fs');
 const uglify = require('uglify-js');
 
