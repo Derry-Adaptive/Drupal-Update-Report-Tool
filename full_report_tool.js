@@ -477,7 +477,32 @@ function extractUpdatesFromTable(table, isCore) {
 }
 
 // Main function to generate update reports
-window.generateUpdateReport = function(type = "help", scope = "all", ticket = null) {
+window.generateUpdateReport = function(type = "help", name = null, options = null) {
+  // Name parameter can be a module name, ticket ID, or null depending on command type
+  let moduleName = null;
+  let ticketId = null;
+  let filterScopes = [];
+  
+  // Determine the meaning of the second parameter based on command type
+  if (typeof name === 'string' && name) {
+    if (type === "add_exclude" || type === "remove_exclude") {
+      moduleName = name;
+    } else if (type === "pantheon") {
+      ticketId = name;
+    }
+    // Otherwise it could be ignored or used for backward compatibility
+  }
+
+  // Process options parameter - can be array of filter scopes or string for backward compatibility
+  if (options !== null) {
+    if (typeof options === 'string') {
+      // Backward compatibility - string in third position was a ticket ID
+      ticketId = options;
+    } else if (Array.isArray(options)) {
+      filterScopes = options;
+    }
+  }
+  
   if (type === "help" || !type) {
     console.log('✅ "generateUpdateReport" is ready to use');
     console.log("Available report types:");
@@ -494,17 +519,12 @@ window.generateUpdateReport = function(type = "help", scope = "all", ticket = nu
     console.log("- remove_exclude <module_name>: Remove a module from the exclude list");
     console.log("- exclude_list: List all excluded modules");
     console.log("\nUsage examples:");
-    console.log('generateUpdateReport("composer")');
-    console.log('generateUpdateReport("csv")');
-    console.log('generateUpdateReport("commit")');
+    console.log('generateUpdateReport("composer", null, ["security"])');
+    console.log('generateUpdateReport("csv", null, ["security"])');
     console.log('generateUpdateReport("table")');
-    console.log('generateUpdateReport("modules")');
-    console.log('generateUpdateReport("pantheon", null, "TICKET-123")');
-    console.log('generateUpdateReport("clear")');
+    console.log('generateUpdateReport("git", null, ["security", "unsupported"])');
+    console.log('generateUpdateReport("pantheon", "d1234")');
     console.log('generateUpdateReport("add_exclude", "module_name")');
-    console.log('generateUpdateReport("remove_exclude", "module_name")');
-    console.log('generateUpdateReport("exclude_list")');
-    console.log('generateUpdateReport("all")');
     return;
   }
   
@@ -514,12 +534,20 @@ window.generateUpdateReport = function(type = "help", scope = "all", ticket = nu
     console.log("🧹 Cleared all module exclusions");
     return;
   } else if (type === "add_exclude") {
-    window._excludedModules.add(scope.toLowerCase());
-    console.log("➕ Excluded module: " + scope);
+    if (!moduleName) {
+      console.log("⚠️ Please provide a module name to exclude");
+      return;
+    }
+    window._excludedModules.add(moduleName.toLowerCase());
+    console.log("➕ Excluded module: " + moduleName);
     return;
   } else if (type === "remove_exclude") {
-    window._excludedModules.delete(scope.toLowerCase());
-    console.log("✅ Removed from exclude list: " + scope);
+    if (!moduleName) {
+      console.log("⚠️ Please provide a module name to remove from exclusion list");
+      return;
+    }
+    window._excludedModules.delete(moduleName.toLowerCase());
+    console.log("✅ Removed from exclude list: " + moduleName);
     return;
   } else if (type === "exclude_list") {
     console.log("🗄️ Currently excluded modules:");
@@ -540,21 +568,21 @@ window.generateUpdateReport = function(type = "help", scope = "all", ticket = nu
     moduleUpdates = moduleUpdates.concat(updates);
   });
   
-  // Create copies of update arrays for filtering
+  // Create copies of update arrays for initial filtering
   let filteredCoreUpdates = [...coreUpdates];
   let filteredModuleUpdates = [...moduleUpdates];
   
-  // Apply scope filtering
-  if (scope !== "all") {
+  // Apply scope filtering if specified in options
+  if (Array.isArray(filterScopes) && filterScopes.length > 0) {
     filteredCoreUpdates = coreUpdates.filter(update => 
-      (update[4] || "").includes(scope)
+      filterScopes.some(scope => (update[4] || "").includes(scope))
     );
     
     filteredModuleUpdates = moduleUpdates.filter(update => 
-      (update[4] || "").includes(scope)
+      filterScopes.some(scope => (update[4] || "").includes(scope))
     );
     
-    console.log(`Filtered to scope "${scope}": ${filteredCoreUpdates.length} core, ${filteredModuleUpdates.length} modules`);
+    console.log(`Filtered to scopes [${filterScopes.join(', ')}]: ${filteredCoreUpdates.length} core, ${filteredModuleUpdates.length} modules`);
   }
   
   // Generate the requested report
@@ -574,16 +602,9 @@ window.generateUpdateReport = function(type = "help", scope = "all", ticket = nu
     console.log("Drush commands for managing modules would go here");
   } 
   else if (type === "pantheon") {
-    const url = getPantheonUrl(ticket);
+    const url = getPantheonUrl(ticketId);
     console.log("🚀 Pantheon URL: " + url);
-  } 
-  else if (type === "all") {
-    generateUpdateReport("composer");
-    generateUpdateReport("csv");
-    generateUpdateReport("table");
-    generateUpdateReport("git");
-    generateUpdateReport("help");
-  } 
+  }
   else {
     console.log(`⚠️ Unknown report type: "${type}"`);
     console.log('Run generateUpdateReport("help") for available options');
@@ -592,18 +613,3 @@ window.generateUpdateReport = function(type = "help", scope = "all", ticket = nu
 
 // Show help immediately when loaded
 generateUpdateReport("help");
-
-// Generate all updates
-generateUpdateReport("composer");
-
-// Generate only security updates
-generateUpdateReport("csv", null, ["security"]);
-
-// Generate security and unsupported updates
-generateUpdateReport("git", null, ["security", "unsupported"]);
-
-// Pantheon URL with ticket - ticket in second parameter
-generateUpdateReport("pantheon", "d1234");
-
-// Module exclusion uses second parameter for module name
-generateUpdateReport("add_exclude", "module_name");
