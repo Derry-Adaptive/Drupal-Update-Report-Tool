@@ -15,18 +15,16 @@ This tool helps you generate a comprehensive report of Drupal module updates, in
 
 ## Requirements
 
-This tool works in any modern web browser with JavaScript enabled. It doesn't require any installation, and it can be used directly on a Drupal site.
+This tool works in any modern web browser with JavaScript enabled. It can be used directly from your browser without requiring any installation on your Drupal site.
 
-## Installation
+## Setup
 
-There is no installation required to use the tool. Simply follow the instructions below to add the script to your Drupal site.
+To set up the tool as a **bookmarklet** in your browser, follow these steps:
 
-### Bookmarklet Installation
-
-To use the tool as a **bookmarklet**, follow these steps:
+### 1. **Bookmarklet Setup**:
 
 1. **Download `bookmarklet.js`**:
-    - [Download the bookmarklet.js file](#) or simply copy the content of the script from `bookmarklet.js` file.
+    - [Download the `bookmarklet.js` file](#) or simply **copy the content** of the script from `bookmarklet.js`.
 
 2. **Create a new bookmark** in your browser.
 3. **Name the bookmark** (e.g., "Drupal Update Report").
@@ -34,7 +32,7 @@ To use the tool as a **bookmarklet**, follow these steps:
 
 5. Now, you can click the bookmark from any page on your Drupal site to run the tool directly.
 
-### 1. **Injecting the Tool into Your Site**:
+### 2. **Injecting the Tool into Your Site**:
 
 Alternatively, you can inject the script into your site using browser developer tools. If you want to add the script manually, follow these steps:
 
@@ -42,13 +40,13 @@ Alternatively, you can inject the script into your site using browser developer 
 - Navigate to the **Console** tab.
 - Paste the full script (from the file you have) into the console and press **Enter**.
 
-### 2. **Best Place to Use**:
+### 3. **Best Place to Use**:
 
 For best results, **use this tool on the Drupal update report page**:
 - Navigate to **`/admin/reports/updates`** on your Drupal site, where module update information is displayed.
 - This tool will extract and process the update information from this page.
 
-### 3. **Available Commands**:
+### 4. **Available Commands**:
 
 You can interact with the tool by calling `generateUpdateReport()` with different arguments. Here are the available commands:
 

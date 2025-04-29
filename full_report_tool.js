@@ -6,25 +6,12 @@
     const excludedModules = window._excludedModules || new Set();
     window._excludedModules = excludedModules;
 
-    // Updated to return the date in DD/MM/YYYY format
     function getCurrentDate() {
         const date = new Date();
-        const day = String(date.getDate()).padStart(2, '0');  // Ensure 2 digits for day
-        const month = String(date.getMonth() + 1).padStart(2, '0');  // Ensure 2 digits for month
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
         const year = date.getFullYear();
-        return `${day}/${month}/${year}`;  // Return in DD/MM/YYYY format
-    }
-
-    function compareVersions(v1, v2) {
-        const a = v1.split('.').map(Number);
-        const b = v2.split('.').map(Number);
-        for (let i = 0; i < Math.max(a.length, b.length); i++) {
-            const n1 = a[i] || 0;
-            const n2 = b[i] || 0;
-            if (n1 > n2) return 1;
-            if (n1 < n2) return -1;
-        }
-        return 0;
+        return `${day}/${month}/${year}`;
     }
 
     function getCurrentCoreVersion() {
@@ -34,10 +21,9 @@
     }
 
     const currentCore = getCurrentCoreVersion();
-    console.log("Current Core Version: ", currentCore);  // Log to verify core version
+    console.log("Current Core Version: ", currentCore); // Log to verify core version
 
     function sanitizeVersion(version) {
-        // Remove any invalid parts of the version string like "^8.x-" and ensure it's valid for Composer
         return version.replace(/^8\.x-/, "");
     }
 
@@ -48,7 +34,6 @@
             const link = row.querySelector(".project-update__title a");
             const name = link?.innerText.trim() || "N/A";
 
-            // Extract machine name from project link
             const projectLink = link?.href || '';
             const machineMatch = projectLink.match(/project\/([^\/]+)/);
             const machine = machineMatch ? machineMatch[1] : name.toLowerCase().replace(/\s+/g, '_');
@@ -60,38 +45,25 @@
 
             let status = "update"; // Default to "update" for valid updates
 
-            // Handle if the module is up-to-date
             if (/up to date/i.test(statusText)) {
                 status = "current";
             }
-            // Handle security updates
             else if (/security update required/i.test(statusText)) {
                 status = "security";
             }
-            // Handle not supported
             else if (/not supported/i.test(statusText)) {
-                if (installed !== recommended) {
-                    const match = compatibilityText.match(/Requires Drupal core:\s*([\d\.]+)\s*to\s*([\d\.]+)/i);
-                    if (match) {
-                        const min = match[1];
-                        const max = match[2];
-                        // Check if current core version is within the recommended range
-                        if (compareVersions(currentCore, min) >= 0 && compareVersions(currentCore, max) <= 0) {
-                            status = "updatable"; // Mark as updatable if a new version is available that resolves unsupported issue
-                        } else {
-                            status = "unsupported"; // No compatible version available
-                        }
-                    } else {
-                        status = "unsupported"; // If no compatibility info, mark as unsupported
-                    }
+                // Check if the "Compatible" text is found in the compatibility details
+                const isCompatible = row.querySelector('.project-update__compatibility-details .compatible');
+                if (isCompatible) {
+                    status = "updatable"; // Mark as updatable if compatible
                 } else {
-                    status = "updatable"; // If installed is not equal to recommended, mark as updatable
+                    status = "unsupported"; // Keep as unsupported if not compatible
                 }
             }
 
             // Add the processed data into the data array
             if (!excludedModules.has(machine.toLowerCase())) {
-                updates.push({ name, machine, status, installed, recommended });
+                updates.push({ name, machine, status, installed, recommended, compatibilityText });
             }
         });
 
@@ -119,10 +91,9 @@
         const sections = { core: [], modules: [], themes: [] };
 
         data.forEach(u => {
-            // Skip 'current' and 'unsupported' modules
             if (u.status === "current" || u.status === "unsupported") return;
 
-            let statusLabel = u.status !== "update" ? ` [${u.status}]` : "";  // Add status label if it's not 'update'
+            let statusLabel = u.status !== "update" ? ` [${u.status}]` : "";
             const entry = `${u.name}${statusLabel} (${u.installed} → ${u.recommended})`;
 
             if (u.name.toLowerCase().includes("core")) {
@@ -146,7 +117,6 @@
         data.forEach(u => {
             if (["unsupported", "current"].includes(u.status)) return;
 
-            // Sanitize version before adding to composer
             const sanitizedVersion = sanitizeVersion(u.recommended);
 
             if (u.name.toLowerCase().includes("core")) {
@@ -175,9 +145,7 @@
         const csv = rows.map(row => row.map(quoteCSV).join(",")).join("\n");
         const blob = new Blob([csv], { type: "text/csv" });
 
-        // Get the current domain for the filename
         const domain = window.location.hostname;
-        // Replace '/' in the date with '-' for a valid filename
         const date = getCurrentDate().replace(/\//g, '-');
         const fileName = `drupal_updates_${domain}_${date}.csv`;
 
@@ -189,7 +157,6 @@
         document.body.removeChild(a);
     }
 
-    // Helper function to quote CSV values
     function quoteCSV(val) {
         val = String(val).replace(/"/g, '""');
         return /["\n\r,]/.test(val) ? `"${val}"` : val;
