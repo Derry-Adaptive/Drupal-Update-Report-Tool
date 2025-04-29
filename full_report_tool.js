@@ -113,7 +113,10 @@
         const sections = { core: [], modules: [], themes: [] };
 
         data.forEach(u => {
-            const statusLabel = u.status !== "update" ? ` [${u.status}]` : "";
+            // Skip 'current' and 'unsupported' modules
+            if (u.status === "current" || u.status === "unsupported") return;
+
+            let statusLabel = u.status !== "update" ? ` [${u.status}]` : "";  // Add status label if it's not 'update'
             const entry = `${u.name}${statusLabel} (${u.installed} → ${u.recommended})`;
 
             if (u.name.toLowerCase().includes("core")) {
@@ -131,6 +134,7 @@
 
         console.log(out);
     }
+
 
     function generateComposerCommand(data) {
         const lines = [];
