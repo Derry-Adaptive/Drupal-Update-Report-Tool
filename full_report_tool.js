@@ -6,8 +6,13 @@
     const excludedModules = window._excludedModules || new Set();
     window._excludedModules = excludedModules;
 
+    // Updated to return the date in DD/MM/YYYY format
     function getCurrentDate() {
-        return new Date().toISOString().split("T")[0];
+        const date = new Date();
+        const day = String(date.getDate()).padStart(2, '0');  // Ensure 2 digits for day
+        const month = String(date.getMonth() + 1).padStart(2, '0');  // Ensure 2 digits for month
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;  // Return in DD/MM/YYYY format
     }
 
     function compareVersions(v1, v2) {
@@ -22,22 +27,23 @@
         return 0;
     }
 
-    // Fetch the current Drupal core version from the first table
     function getCurrentCoreVersion() {
-        const firstRow = document.querySelector("table.update tbody tr");
-        const coreText = firstRow?.querySelector(".project-update__title")?.innerText || '';
+        const coreText = document.querySelector('.update-status')?.innerText || '';
         const match = coreText.match(/Drupal\s+(\d+\.\d+\.\d+)/i);
         return match ? match[1] : "0.0.0";
     }
 
-    // Step 1: Get the current core version from the first table
     const currentCore = getCurrentCoreVersion();
     console.log("Current Core Version: ", currentCore);  // Log to verify core version
+
+    function sanitizeVersion(version) {
+        // Remove any invalid parts of the version string like "^8.x-" and ensure it's valid for Composer
+        return version.replace(/^8\.x-/, "");
+    }
 
     function fetchUpdateData() {
         const updates = [];
 
-        // Process all subsequent rows (modules, themes, etc.)
         document.querySelectorAll("table.update tbody tr").forEach(row => {
             const link = row.querySelector(".project-update__title a");
             const name = link?.innerText.trim() || "N/A";
@@ -135,19 +141,21 @@
         console.log(out);
     }
 
-
     function generateComposerCommand(data) {
         const lines = [];
         data.forEach(u => {
             if (["unsupported", "current"].includes(u.status)) return;
 
+            // Sanitize version before adding to composer
+            const sanitizedVersion = sanitizeVersion(u.recommended);
+
             if (u.name.toLowerCase().includes("core")) {
-                lines.push(`drupal/core-recommended:^${u.recommended}`);
-                lines.push(`drupal/core-composer-scaffold:^${u.recommended}`);
-                lines.push(`drupal/core-project-message:^${u.recommended}`);
-                lines.push(`drupal/core:^${u.recommended}`);
+                lines.push(`drupal/core-recommended:^${sanitizedVersion}`);
+                lines.push(`drupal/core-composer-scaffold:^${sanitizedVersion}`);
+                lines.push(`drupal/core-project-message:^${sanitizedVersion}`);
+                lines.push(`drupal/core:^${sanitizedVersion}`);
             } else {
-                lines.push(`drupal/${u.machine}:^${u.recommended}`);
+                lines.push(`drupal/${u.machine}:^${sanitizedVersion}`);
             }
         });
 
@@ -158,6 +166,35 @@
         }
     }
 
+    function exportCSV(data) {
+        const rows = [
+            HEADERS,
+            ...data.map(u => [u.name, u.status, u.installed, u.recommended])
+        ];
+
+        const csv = rows.map(row => row.map(quoteCSV).join(",")).join("\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+
+        // Get the current domain for the filename
+        const domain = window.location.hostname;
+        // Replace '/' in the date with '-' for a valid filename
+        const date = getCurrentDate().replace(/\//g, '-');
+        const fileName = `drupal_updates_${domain}_${date}.csv`;
+
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    // Helper function to quote CSV values
+    function quoteCSV(val) {
+        val = String(val).replace(/"/g, '""');
+        return /["\n\r,]/.test(val) ? `"${val}"` : val;
+    }
+
     window.generateUpdateReport = function(type = "help") {
         if (type === "help" || !type) {
             console.log('✅ "generateUpdateReport" is ready to use');
@@ -166,6 +203,7 @@
             console.log('🔹 generateUpdateReport("commit"); → Generate commit message');
             console.log('🔹 generateUpdateReport("json"); → Output updates as JSON');
             console.log('🔹 generateUpdateReport("composer"); → Generate composer require command');
+            console.log('🔹 generateUpdateReport("csv"); → Export CSV of updates');
             console.log('\n🧰 EXCLUDE OPTIONS:\n');
             console.log('🔹 generateUpdateReport("add_exclude", "module_name"); → Add a module to the exclude list');
             console.log('🔹 generateUpdateReport("remove_exclude", "module_name"); → Remove a module from');
@@ -194,6 +232,7 @@
         else if (type === "commit") generateCommitMessage(updates);
         else if (type === "composer") generateComposerCommand(updates);
         else if (type === "json") console.log(JSON.stringify(updates, null, 2));
+        else if (type === "csv") exportCSV(updates);  // CSV export
         else console.log("Unknown type.");
     };
 
