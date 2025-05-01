@@ -1,5 +1,5 @@
 (function () {
-    const TOOL_VERSION = "v5.0";
+    const TOOL_VERSION = "v5.2";
     console.log(`🚀 Drupal Update Report Tool (${TOOL_VERSION}) initialized.`);
 
     const HEADERS = ["Name", "Status", "Installed", "Recommended"];
@@ -21,7 +21,7 @@
     }
 
     const currentCore = getCurrentCoreVersion();
-    console.log("Current Core Version: ", currentCore); // Log to verify core version
+    console.log("Current Core Version: ", currentCore);
 
     function sanitizeVersion(version) {
         return version.replace(/^8\.x-/, "");
@@ -40,28 +40,26 @@
 
             const installed = (row.querySelector(".project-update__title")?.innerText.replace(name, "").trim()) || "N/A";
             const recommended = row.querySelector(".project-update__version--recommended a")?.innerText.trim() || "N/A";
-            const statusText = row.querySelector(".project-update__status span")?.innerText || '';
+            const statusText = row.querySelector(".project-update__status")?.textContent.trim().toLowerCase() || '';
+            const statusHtml = row.querySelector(".project-update__status")?.innerHTML.toLowerCase() || '';
             const compatibilityText = row.querySelector('.project-update__compatibility-details')?.innerText || '';
 
-            let status = "update"; // Default to "update" for valid updates
+            let status = "update";
 
-            if (/up to date/i.test(statusText)) {
+            if (statusText.includes("up to date")) {
                 status = "current";
             }
-            else if (/security update required/i.test(statusText)) {
+            else if (statusText.includes("security update required")) {
                 status = "security";
             }
-            else if (/not supported/i.test(statusText)) {
-                // Check if the "Compatible" text is found in the compatibility details
+            else if (statusText.includes("not supported")) {
                 const isCompatible = row.querySelector('.project-update__compatibility-details .compatible');
-                if (isCompatible) {
-                    status = "updatable"; // Mark as updatable if compatible
-                } else {
-                    status = "unsupported"; // Keep as unsupported if not compatible
-                }
+                status = isCompatible ? "updatable" : "unsupported";
+            }
+            else if (statusHtml.includes("no available releases found")) {
+                status = "unsupported";
             }
 
-            // Add the processed data into the data array
             if (!excludedModules.has(machine.toLowerCase())) {
                 updates.push({ name, machine, status, installed, recommended, compatibilityText });
             }
@@ -91,8 +89,6 @@
         const sections = { core: [], modules: [], themes: [] };
 
         data.forEach(u => {
-            if (u.status === "current" || u.status === "unsupported") return;
-
             let statusLabel = u.status !== "update" ? ` [${u.status}]` : "";
             const entry = `${u.name}${statusLabel} (${u.installed} → ${u.recommended})`;
 
@@ -115,7 +111,12 @@
     function generateComposerCommand(data) {
         const lines = [];
         data.forEach(u => {
-            if (["unsupported", "current"].includes(u.status)) return;
+            if (
+                u.status === "unsupported" ||
+                sanitizeVersion(u.installed) === sanitizeVersion(u.recommended)
+            ) {
+                return;
+            }
 
             const sanitizedVersion = sanitizeVersion(u.recommended);
 
@@ -162,8 +163,8 @@
         return /["\n\r,]/.test(val) ? `"${val}"` : val;
     }
 
-    window.generateUpdateReport = function(type = "help") {
-        if (type === "help" || !type) {
+    window.generateUpdateReport = function(action = "help", name = "", scope = ["security", "updatable", "update"]) {
+        if (action === "help" || !action) {
             console.log('✅ "generateUpdateReport" is ready to use');
             console.log('📦 REPORT OUTPUT OPTIONS:\n');
             console.log('🔹 generateUpdateReport("ascii"); → Display updates in an ASCII table');
@@ -173,34 +174,46 @@
             console.log('🔹 generateUpdateReport("csv"); → Export CSV of updates');
             console.log('\n🧰 EXCLUDE OPTIONS:\n');
             console.log('🔹 generateUpdateReport("add_exclude", "module_name"); → Add a module to the exclude list');
-            console.log('🔹 generateUpdateReport("remove_exclude", "module_name"); → Remove a module from');
+            console.log('🔹 generateUpdateReport("remove_exclude", "module_name"); → Remove a module from the exclude list');
+            console.log('🔹 generateUpdateReport("exclude_list"); → List all currently excluded modules');
             return;
         }
 
-        if (type === "add_exclude") {
-            excludedModules.add(arguments[1].toLowerCase());
-            console.log(`🛑 Excluded: ${arguments[1]}`);
+        // Handle exclude management
+        if (action === "add_exclude") {
+            excludedModules.add(name.toLowerCase());
+            console.log(`🛑 Excluded: ${name}`);
             return;
         }
-        if (type === "remove_exclude") {
-            excludedModules.delete(arguments[1].toLowerCase());
-            console.log(`✅ Removed from exclude: ${arguments[1]}`);
+        if (action === "remove_exclude") {
+            excludedModules.delete(name.toLowerCase());
+            console.log(`✅ Removed from exclude: ${name}`);
             return;
         }
-        if (type === "exclude_list") {
+        if (action === "exclude_list") {
             console.log([...excludedModules].sort().join("\n") || "No exclusions");
             return;
         }
 
-        const updates = fetchUpdateData().filter(u => u.status !== "current");
-        if (!updates.length) return console.log("✅ No updates found.");
+        // Fetch and filter
+        let updates;
+        if (scope.includes("excluded")) {
+            updates = fetchUpdateData().filter(u => excludedModules.has(u.machine.toLowerCase()));
+        } else if (scope.includes("all")) {
+            updates = fetchUpdateData();
+        } else {
+            updates = fetchUpdateData().filter(u => scope.includes(u.status));
+        }
 
-        if (type === "ascii") generateAsciiTable(updates);
-        else if (type === "commit") generateCommitMessage(updates);
-        else if (type === "composer") generateComposerCommand(updates);
-        else if (type === "json") console.log(JSON.stringify(updates, null, 2));
-        else if (type === "csv") exportCSV(updates);  // CSV export
-        else console.log("Unknown type.");
+        if (!updates.length) return console.log("✅ No updates found for selected scope.");
+
+        // Output
+        if (action === "ascii") generateAsciiTable(updates);
+        else if (action === "commit") generateCommitMessage(updates);
+        else if (action === "composer") generateComposerCommand(updates);
+        else if (action === "json") console.log(JSON.stringify(updates, null, 2));
+        else if (action === "csv") exportCSV(updates);
+        else console.log("❓ Unknown report type.");
     };
 
     generateUpdateReport("help");
