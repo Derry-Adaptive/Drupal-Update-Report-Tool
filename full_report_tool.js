@@ -1,5 +1,28 @@
+/**
+ * TOOL CONTEXT FOR CHATGPT AND OTHER REVIEW TOOLS
+ * -----------------------------------------------
+ * This script is:
+ * - A SELF-CONTAINED TOOL intended for browser BOOKMARKLET use only.
+ * - Post-processed (minified and URI-encoded) by a separate script.
+ * - Meant to run on a CLIENT-SIDE Drupal admin page (no server).
+ *
+ * DO NOT RECOMMEND:
+ * - Module systems (ESM/CommonJS)
+ * - Security headers (CSP, etc.)
+ * - Async loading or server-side fetching
+ * - External JS libraries or CDNs
+ * - Framework use (React, Vue, etc.)
+ *
+ * FOCUS ONLY ON:
+ * - JavaScript logic bugs
+ * - DOM scraping improvements
+ * - Output formatting issues
+ * - Optional console UX or debug helpers
+ *
+ * ✅ Bookmarklet-safe by design. No external dependencies. No persistence.
+ */
 (function () {
-    const TOOL_VERSION = "v5.2";
+    const TOOL_VERSION = "v5.6";
     console.log(`🚀 Drupal Update Report Tool (${TOOL_VERSION}) initialized.`);
 
     const HEADERS = ["Name", "Status", "Installed", "Recommended"];
@@ -24,22 +47,35 @@
     console.log("Current Core Version: ", currentCore);
 
     function sanitizeVersion(version) {
-        return version.replace(/^8\.x-/, "");
+        return version.replace(/^8\.x-/, "").trim();
     }
 
     function fetchUpdateData() {
         const updates = [];
 
         document.querySelectorAll("table.update tbody tr").forEach(row => {
-            const link = row.querySelector(".project-update__title a");
-            const name = link?.innerText.trim() || "N/A";
+            const titleCell = row.querySelector(".project-update__title");
+            const rawTitle = titleCell?.textContent.trim() || '';
+            const titleParts = rawTitle.split(/\s{2,}/);
+
+            let name = titleParts[0] || "N/A";
+            const installed = sanitizeVersion(titleParts[1] || "N/A");
+
+            const link = titleCell?.querySelector("a");
+            if (link) {
+                name = link.innerText.trim();
+            }
 
             const projectLink = link?.href || '';
             const machineMatch = projectLink.match(/project\/([^\/]+)/);
             const machine = machineMatch ? machineMatch[1] : name.toLowerCase().replace(/\s+/g, '_');
 
-            const installed = (row.querySelector(".project-update__title")?.innerText.replace(name, "").trim()) || "N/A";
-            const recommended = row.querySelector(".project-update__version--recommended a")?.innerText.trim() || "N/A";
+            const recommendedRaw = row.querySelector(".project-update__version--recommended a")?.innerText.trim() || "N/A";
+            const recommended = sanitizeVersion(recommendedRaw);
+
+            const latestRaw = row.querySelector(".version-latest.project-update__version a")?.innerText.trim() || recommendedRaw;
+            const latest = sanitizeVersion(latestRaw);
+
             const statusText = row.querySelector(".project-update__status")?.textContent.trim().toLowerCase() || '';
             const statusHtml = row.querySelector(".project-update__status")?.innerHTML.toLowerCase() || '';
             const compatibilityText = row.querySelector('.project-update__compatibility-details')?.innerText || '';
@@ -48,20 +84,17 @@
 
             if (statusText.includes("up to date")) {
                 status = "current";
-            }
-            else if (statusText.includes("security update required")) {
+            } else if (statusText.includes("security update required")) {
                 status = "security";
-            }
-            else if (statusText.includes("not supported")) {
+            } else if (statusText.includes("not supported")) {
                 const isCompatible = row.querySelector('.project-update__compatibility-details .compatible');
                 status = isCompatible ? "updatable" : "unsupported";
-            }
-            else if (statusHtml.includes("no available releases found")) {
+            } else if (statusHtml.includes("no available releases found")) {
                 status = "unsupported";
             }
 
             if (!excludedModules.has(machine.toLowerCase())) {
-                updates.push({ name, machine, status, installed, recommended, compatibilityText });
+                updates.push({ name, machine, status, installed, recommended, latest, compatibilityText });
             }
         });
 
@@ -108,25 +141,24 @@
         console.log(out);
     }
 
-    function generateComposerCommand(data) {
+    function generateComposerCommand(data, useLatest = false) {
         const lines = [];
         data.forEach(u => {
+            const targetVersion = useLatest ? u.latest : u.recommended;
             if (
                 u.status === "unsupported" ||
-                sanitizeVersion(u.installed) === sanitizeVersion(u.recommended)
+                u.installed === targetVersion
             ) {
                 return;
             }
 
-            const sanitizedVersion = sanitizeVersion(u.recommended);
-
             if (u.name.toLowerCase().includes("core")) {
-                lines.push(`drupal/core-recommended:^${sanitizedVersion}`);
-                lines.push(`drupal/core-composer-scaffold:^${sanitizedVersion}`);
-                lines.push(`drupal/core-project-message:^${sanitizedVersion}`);
-                lines.push(`drupal/core:^${sanitizedVersion}`);
+                lines.push(`drupal/core-recommended:^${targetVersion}`);
+                lines.push(`drupal/core-composer-scaffold:^${targetVersion}`);
+                lines.push(`drupal/core-project-message:^${targetVersion}`);
+                lines.push(`drupal/core:^${targetVersion}`);
             } else {
-                lines.push(`drupal/${u.machine}:^${sanitizedVersion}`);
+                lines.push(`drupal/${u.machine}:^${targetVersion}`);
             }
         });
 
@@ -153,6 +185,11 @@
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
         a.download = fileName;
+
+        a.addEventListener('click', () => {
+            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        });
+
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -163,7 +200,7 @@
         return /["\n\r,]/.test(val) ? `"${val}"` : val;
     }
 
-    window.generateUpdateReport = function(action = "help", name = "", scope = ["security", "updatable", "update"]) {
+    window.generateUpdateReport = function (action = "help", name = "", scope = ["security", "updatable", "update"], version = "recommended") {
         if (action === "help" || !action) {
             console.log('✅ "generateUpdateReport" is ready to use');
             console.log('📦 REPORT OUTPUT OPTIONS:\n');
@@ -171,6 +208,7 @@
             console.log('🔹 generateUpdateReport("commit"); → Generate commit message');
             console.log('🔹 generateUpdateReport("json"); → Output updates as JSON');
             console.log('🔹 generateUpdateReport("composer"); → Generate composer require command');
+            console.log('🔹 generateUpdateReport("composer", "", ["all"], "latest"); → Use latest available versions (e.g. beta/dev)');
             console.log('🔹 generateUpdateReport("csv"); → Export CSV of updates');
             console.log('\n🧰 EXCLUDE OPTIONS:\n');
             console.log('🔹 generateUpdateReport("add_exclude", "module_name"); → Add a module to the exclude list');
@@ -179,7 +217,6 @@
             return;
         }
 
-        // Handle exclude management
         if (action === "add_exclude") {
             excludedModules.add(name.toLowerCase());
             console.log(`🛑 Excluded: ${name}`);
@@ -195,7 +232,6 @@
             return;
         }
 
-        // Fetch and filter
         let updates;
         if (scope.includes("excluded")) {
             updates = fetchUpdateData().filter(u => excludedModules.has(u.machine.toLowerCase()));
@@ -207,10 +243,9 @@
 
         if (!updates.length) return console.log("✅ No updates found for selected scope.");
 
-        // Output
         if (action === "ascii") generateAsciiTable(updates);
         else if (action === "commit") generateCommitMessage(updates);
-        else if (action === "composer") generateComposerCommand(updates);
+        else if (action === "composer") generateComposerCommand(updates, version === "latest");
         else if (action === "json") console.log(JSON.stringify(updates, null, 2));
         else if (action === "csv") exportCSV(updates);
         else console.log("❓ Unknown report type.");
