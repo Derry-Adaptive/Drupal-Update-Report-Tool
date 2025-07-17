@@ -1,255 +1,146 @@
 /**
- * TOOL CONTEXT FOR CHATGPT AND OTHER REVIEW TOOLS
- * -----------------------------------------------
- * This script is:
- * - A SELF-CONTAINED TOOL intended for browser BOOKMARKLET use only.
- * - Post-processed (minified and URI-encoded) by a separate script.
- * - Meant to run on a CLIENT-SIDE Drupal admin page (no server).
+ * Drupal Update Report Tool (v6.0)
+ * --------------------------------
+ * This script is compiled and minified into a bookmarklet
+ * and intended to be run client-side only, directly in the browser
+ * on a Drupal site's /admin/reports/updates page.
  *
- * DO NOT RECOMMEND:
- * - Module systems (ESM/CommonJS)
- * - Security headers (CSP, etc.)
- * - Async loading or server-side fetching
- * - External JS libraries or CDNs
- * - Framework use (React, Vue, etc.)
+ * ✅ DO NOT:
+ * - Use ES modules or imports
+ * - Add async/await or network fetches
+ * - Add third-party dependencies
+ * - Suggest server-side logic or CSP fixes
  *
- * FOCUS ONLY ON:
- * - JavaScript logic bugs
+ * ✅ FOCUS ON:
  * - DOM scraping improvements
- * - Output formatting issues
- * - Optional console UX or debug helpers
- *
- * ✅ Bookmarklet-safe by design. No external dependencies. No persistence.
+ * - Bookmarklet-safe JavaScript logic
+ * - Extensible, clean options-based interface
  */
-(function () {
-    const TOOL_VERSION = "v5.6";
-    console.log(`🚀 Drupal Update Report Tool (${TOOL_VERSION}) initialized.`);
 
-    const HEADERS = ["Name", "Status", "Installed", "Recommended"];
-    const excludedModules = window._excludedModules || new Set();
-    window._excludedModules = excludedModules;
+javascript:(()=>{
+  console.log("✨ Drupal Update Report Tool (v6.2) initialized.");
+  let c=["Name","Status","Installed","Recommended"],u=window._excludedModules||new Set;
+  function d(){let e=new Date;return String(e.getDate()).padStart(2,"0")+"/"+String(e.getMonth()+1).padStart(2,"0")+"/"+e.getFullYear()}
+  function i(e){return e.replace(/^8\.x-/,"").trim()}
+  function m(e){return e=String(e).replace(/"/g,'""'),/["\n\r,]/.test(e)?`"${e}"`:e}
 
-    function getCurrentDate() {
-        const date = new Date();
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}/${month}/${year}`;
-    }
+  window._excludedModules=u;
+  window.generateUpdateReport=function(t="help",l={}){
+    let {
+      name:e = "",
+      scope:o = ["security","updatable","update"],
+      version:n = "recommended",
+      override:overrideMap = {}
+    } = l;
 
-    function getCurrentCoreVersion() {
-        const coreText = document.querySelector('.update-status')?.innerText || '';
-        const match = coreText.match(/Drupal\s+(\d+\.\d+\.\d+)/i);
-        return match ? match[1] : "0.0.0";
-    }
+    overrideMap = Object.fromEntries(
+      Object.entries(overrideMap).map(([k,v]) => [k.toLowerCase(), v])
+    );
 
-    const currentCore = getCurrentCoreVersion();
-    console.log("Current Core Version: ", currentCore);
+    function p(){
+      let d=[];
+      document.querySelectorAll("table.update tbody tr").forEach(e=>{
+        let t=e.querySelector(".project-update__title"),
+          o=(t?.textContent.trim()||"").split(/\s{2,}/),
+          n=o[0]||"N/A",
+          a=i(o[1]||"N/A");
+        t=t?.querySelector("a");
+        if(t)n=t.innerText.trim();
+        let s=(t?.href||"").match(/project\/([^\/]+)/),
+          r=s?s[1]:n.toLowerCase().replace(/\s+/g,"_"),
+          l=e.querySelector(".project-update__version--recommended a")?.innerText.trim()||"N/A",
+          mVer=i(l),
+          f=i(e.querySelector(".version-latest.project-update__version a")?.innerText.trim()||l),
+          h=e.querySelector(".project-update__status")?.textContent.trim().toLowerCase()||"",
+          g=e.querySelector(".project-update__status")?.innerHTML.toLowerCase()||"",
+          b="update";
+        h.includes("up to date")?b="current":
+          h.includes("security update required")?b="security":
+            h.includes("not supported")?(h=e.querySelector(".project-update__compatibility-details .compatible"),b=h?"updatable":"unsupported"):
+              g.includes("no available releases found")&&(b="unsupported");
 
-    function sanitizeVersion(version) {
-        return version.replace(/^8\.x-/, "").trim();
-    }
+        let fullMachine = `drupal/${r}`.toLowerCase();
+        let overrideVersion = overrideMap[fullMachine];
 
-    function fetchUpdateData() {
-        const updates = [];
-
-        document.querySelectorAll("table.update tbody tr").forEach(row => {
-            const titleCell = row.querySelector(".project-update__title");
-            const rawTitle = titleCell?.textContent.trim() || '';
-            const titleParts = rawTitle.split(/\s{2,}/);
-
-            let name = titleParts[0] || "N/A";
-            const installed = sanitizeVersion(titleParts[1] || "N/A");
-
-            const link = titleCell?.querySelector("a");
-            if (link) {
-                name = link.innerText.trim();
-            }
-
-            const projectLink = link?.href || '';
-            const machineMatch = projectLink.match(/project\/([^\/]+)/);
-            const machine = machineMatch ? machineMatch[1] : name.toLowerCase().replace(/\s+/g, '_');
-
-            const recommendedRaw = row.querySelector(".project-update__version--recommended a")?.innerText.trim() || "N/A";
-            const recommended = sanitizeVersion(recommendedRaw);
-
-            const latestRaw = row.querySelector(".version-latest.project-update__version a")?.innerText.trim() || recommendedRaw;
-            const latest = sanitizeVersion(latestRaw);
-
-            const statusText = row.querySelector(".project-update__status")?.textContent.trim().toLowerCase() || '';
-            const statusHtml = row.querySelector(".project-update__status")?.innerHTML.toLowerCase() || '';
-            const compatibilityText = row.querySelector('.project-update__compatibility-details')?.innerText || '';
-
-            let status = "update";
-
-            if (statusText.includes("up to date")) {
-                status = "current";
-            } else if (statusText.includes("security update required")) {
-                status = "security";
-            } else if (statusText.includes("not supported")) {
-                const isCompatible = row.querySelector('.project-update__compatibility-details .compatible');
-                status = isCompatible ? "updatable" : "unsupported";
-            } else if (statusHtml.includes("no available releases found")) {
-                status = "unsupported";
-            }
-
-            if (!excludedModules.has(machine.toLowerCase())) {
-                updates.push({ name, machine, status, installed, recommended, latest, compatibilityText });
-            }
-        });
-
-        return updates;
-    }
-
-    function generateAsciiTable(data) {
-        const colWidths = HEADERS.map(h => Math.max(h.length, ...data.map(d => (d[h.toLowerCase()] || '').length)));
-        const makeLine = (char) => '+' + colWidths.map(w => char.repeat(w + 2)).join('+') + '+';
-        const formatRow = row => '| ' + HEADERS.map((h, i) => (row[h.toLowerCase()] || '').padEnd(colWidths[i])).join(' | ') + ' |';
-
-        const lines = [];
-        lines.push(makeLine('-'));
-        lines.push(formatRow(Object.fromEntries(HEADERS.map(h => [h.toLowerCase(), h]))));
-        lines.push(makeLine('='));
-        data.forEach(d => lines.push(formatRow(d)));
-        lines.push(makeLine('-'));
-
-        console.log("```\n" + lines.join('\n') + "\n```");
-    }
-
-    function generateCommitMessage(data) {
-        const date = getCurrentDate();
-        let out = `Drupal updates - ${date}`;
-        const sections = { core: [], modules: [], themes: [] };
-
-        data.forEach(u => {
-            let statusLabel = u.status !== "update" ? ` [${u.status}]` : "";
-            const entry = `${u.name}${statusLabel} (${u.installed} → ${u.recommended})`;
-
-            if (u.name.toLowerCase().includes("core")) {
-                sections.core.push(entry);
-            } else if (u.name.toLowerCase().includes("theme")) {
-                sections.themes.push(entry);
-            } else {
-                sections.modules.push(entry);
-            }
-        });
-
-        if (sections.core.length) out += "\n\nCore updates:\n- " + sections.core.join("\n- ");
-        if (sections.modules.length) out += "\n\nModule updates:\n- " + sections.modules.join("\n- ");
-        if (sections.themes.length) out += "\n\nTheme updates:\n- " + sections.themes.join("\n- ");
-
-        console.log(out);
-    }
-
-    function generateComposerCommand(data, useLatest = false) {
-        const lines = [];
-        data.forEach(u => {
-            const targetVersion = useLatest ? u.latest : u.recommended;
-            if (
-                u.status === "unsupported" ||
-                u.installed === targetVersion
-            ) {
-                return;
-            }
-
-            if (u.name.toLowerCase().includes("core")) {
-                lines.push(`drupal/core-recommended:^${targetVersion}`);
-                lines.push(`drupal/core-composer-scaffold:^${targetVersion}`);
-                lines.push(`drupal/core-project-message:^${targetVersion}`);
-                lines.push(`drupal/core:^${targetVersion}`);
-            } else {
-                lines.push(`drupal/${u.machine}:^${targetVersion}`);
-            }
-        });
-
-        if (lines.length) {
-            console.log("composer require -W " + lines.join(" "));
-        } else {
-            console.log("✅ No composer updates required.");
+        if (!u.has(r.toLowerCase())) {
+          d.push({
+            name: n,
+            machine: r,
+            status: b,
+            installed: a,
+            recommended: overrideVersion || mVer,
+            latest: f
+          });
         }
+      });
+      return d;
     }
 
-    function exportCSV(data) {
-        const rows = [
-            HEADERS,
-            ...data.map(u => [u.name, u.status, u.installed, u.recommended])
-        ];
-
-        const csv = rows.map(row => row.map(quoteCSV).join(",")).join("\n");
-        const blob = new Blob([csv], { type: "text/csv" });
-
-        const domain = window.location.hostname;
-        const date = getCurrentDate().replace(/\//g, '-');
-        const fileName = `drupal_updates_${domain}_${date}.csv`;
-
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = fileName;
-
-        a.addEventListener('click', () => {
-            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-        });
-
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+    if("help"!==t&&t){
+      if("add_exclude"===t)u.add(e.toLowerCase()),console.log("🛑 Excluded: "+e);
+      else if("remove_exclude"===t)u.delete(e.toLowerCase()),console.log("✅ Removed from exclude: "+e);
+      else if("exclude_list"===t)console.log([...u].sort().join("\n")||"No exclusions");
+      else{
+        let r = o.includes("excluded") ? p().filter(e=>u.has(e.machine.toLowerCase())) :
+          o.includes("all") ? p() :
+            p().filter(e=>o.includes(e.status));
+        if(!r.length)return console.log("✅ No updates found for selected scope.");
+        if("ascii"===t){
+          let n=c.map(t=>Math.max(t.length,...r.map(e=>(e[t.toLowerCase()]||"").length))),
+            s=t=>"+"+n.map(e=>"-".repeat(e+2)).join("+")+"+",
+            a=e=>"| "+c.map((t,i)=>(e[t.toLowerCase()]||"").padEnd(n[i])).join(" | ")+" |",
+            o=[s("-"),a(Object.fromEntries(c.map(e=>[e.toLowerCase(),e]))),s("=")];
+          r.forEach(e=>o.push(a(e)));o.push(s("-"));
+          console.log("```\n"+o.join("\n")+"\n```");
+        } else if("commit"===t){
+          let e="Drupal updates - "+d(),o={core:[],modules:[],themes:[]};
+          r.forEach(e=>{
+            let t="update"!==e.status?` [${e.status}]`:"",
+              a=e.name+t+` (${e.installed} → ${e.recommended})`;
+            e.name.toLowerCase().includes("core")?o.core.push(a):
+              e.name.toLowerCase().includes("theme")?o.themes.push(a):o.modules.push(a);
+          });
+          o.core.length&&(e+="\n\nCore updates:\n- "+o.core.join("\n- "));
+          o.modules.length&&(e+="\n\nModule updates:\n- "+o.modules.join("\n- "));
+          o.themes.length&&(e+="\n\nTheme updates:\n- "+o.themes.join("\n- "));
+          console.log(e);
+        } else if("composer"===t){
+          let a="latest"===n, o=[];
+          r.forEach(e=>{
+            const machine = `drupal/${e.machine}`.toLowerCase();
+            const targetVersion = e.recommended;
+            if("unsupported"!==e.status && e.installed!==targetVersion){
+              if(e.name.toLowerCase().includes("core")){
+                o.push("drupal/core-recommended:^"+targetVersion);
+                o.push("drupal/core-composer-scaffold:^"+targetVersion);
+                o.push("drupal/core-project-message:^"+targetVersion);
+                o.push("drupal/core:^"+targetVersion);
+              } else {
+                o.push(`${machine}:^${targetVersion}`);
+              }
+            }
+          });
+          o.length?console.log("composer require -W "+o.join(" ")):console.log("✅ No composer updates required.");
+        } else if("json"===t){
+          console.log(JSON.stringify(r,null,2));
+        } else if("csv"===t){
+          let a=[c,...r.map(e=>[e.name,e.status,e.installed,e.recommended])]
+              .map(e=>e.map(m).join(",")).join("\n"),
+            f=new Blob([a],{type:"text/csv"}),
+            s=`drupal_updates_${window.location.hostname}_${d().replace(/\//g,"-")}.csv`,
+            v=document.createElement("a");
+          v.href=URL.createObjectURL(f);
+          v.download=s;
+          v.addEventListener("click",()=>setTimeout(()=>URL.revokeObjectURL(v.href),1e3));
+          document.body.appendChild(v),v.click(),document.body.removeChild(v);
+        } else console.log("❓ Unknown report type.");
+      }
+    } else {
+      console.log('✅ "generateUpdateReport(action, options)" is ready to use');
+      console.log('📦 Actions: "ascii", "csv", "json", "commit", "composer", "add_exclude", "remove_exclude", "exclude_list"');
+      console.log("🧰 Options: { name, scope, version, override }");
+      console.log('🔹 Example: generateUpdateReport("composer", { scope: ["all"], override: { "drupal/core": "10.4.8" } })');
     }
-
-    function quoteCSV(val) {
-        val = String(val).replace(/"/g, '""');
-        return /["\n\r,]/.test(val) ? `"${val}"` : val;
-    }
-
-    window.generateUpdateReport = function (action = "help", name = "", scope = ["security", "updatable", "update"], version = "recommended") {
-        if (action === "help" || !action) {
-            console.log('✅ "generateUpdateReport" is ready to use');
-            console.log('📦 REPORT OUTPUT OPTIONS:\n');
-            console.log('🔹 generateUpdateReport("ascii"); → Display updates in an ASCII table');
-            console.log('🔹 generateUpdateReport("commit"); → Generate commit message');
-            console.log('🔹 generateUpdateReport("json"); → Output updates as JSON');
-            console.log('🔹 generateUpdateReport("composer"); → Generate composer require command');
-            console.log('🔹 generateUpdateReport("composer", "", ["all"], "latest"); → Use latest available versions (e.g. beta/dev)');
-            console.log('🔹 generateUpdateReport("csv"); → Export CSV of updates');
-            console.log('\n🧰 EXCLUDE OPTIONS:\n');
-            console.log('🔹 generateUpdateReport("add_exclude", "module_name"); → Add a module to the exclude list');
-            console.log('🔹 generateUpdateReport("remove_exclude", "module_name"); → Remove a module from the exclude list');
-            console.log('🔹 generateUpdateReport("exclude_list"); → List all currently excluded modules');
-            return;
-        }
-
-        if (action === "add_exclude") {
-            excludedModules.add(name.toLowerCase());
-            console.log(`🛑 Excluded: ${name}`);
-            return;
-        }
-        if (action === "remove_exclude") {
-            excludedModules.delete(name.toLowerCase());
-            console.log(`✅ Removed from exclude: ${name}`);
-            return;
-        }
-        if (action === "exclude_list") {
-            console.log([...excludedModules].sort().join("\n") || "No exclusions");
-            return;
-        }
-
-        let updates;
-        if (scope.includes("excluded")) {
-            updates = fetchUpdateData().filter(u => excludedModules.has(u.machine.toLowerCase()));
-        } else if (scope.includes("all")) {
-            updates = fetchUpdateData();
-        } else {
-            updates = fetchUpdateData().filter(u => scope.includes(u.status));
-        }
-
-        if (!updates.length) return console.log("✅ No updates found for selected scope.");
-
-        if (action === "ascii") generateAsciiTable(updates);
-        else if (action === "commit") generateCommitMessage(updates);
-        else if (action === "composer") generateComposerCommand(updates, version === "latest");
-        else if (action === "json") console.log(JSON.stringify(updates, null, 2));
-        else if (action === "csv") exportCSV(updates);
-        else console.log("❓ Unknown report type.");
-    };
-
-    generateUpdateReport("help");
+  };
+  generateUpdateReport("help");
 })();
