@@ -1,61 +1,196 @@
-# Drupal Update Report Tool
+# Drupal Update Report Tool (DURT)
 
-This tool helps you generate a comprehensive report of Drupal module updates directly from the browser — without installing anything on your site. It parses the `/admin/reports/updates` page and offers flexible output formats and update commands.
+The **Drupal Update Report Tool (DURT)** generates Drupal update reports directly from the `/admin/reports/updates` page without installing anything on your site.
 
-Designed to be used as a **bookmarklet**, this script is compiled and minified separately and runs fully client-side in any modern browser.
+It parses the Drupal update status table in the browser and produces structured output such as Composer commands, commit messages, and update reports.
 
----
-
-## ✨ Features
-
-- **Display Drupal Updates**: Scans all modules for status: current, update, security, unsupported.
-- **Export Options**:
-  - `ascii` — Print table-formatted report in console
-  - `csv` — Download CSV with domain and date in filename
-  - `json` — Output raw data
-  - `commit` — Generate commit message format
-  - `composer` — Output `composer require` command
-- **Version Targeting**: Choose between `recommended` (default) or `latest` versions
-- **Exclusion Controls**: Temporarily or persistently exclude modules
-- **No Dependencies**: No server-side or API access required
+The tool runs entirely **client-side** as a **bookmarklet** and requires no modules, APIs, or server access.
 
 ---
 
-## ⚙️ Requirements
+# Features
 
-- A modern browser with JavaScript enabled
-- A Drupal site with accessible `/admin/reports/updates` page
-- Works with Drupal 8, 9, 10, and 11
+## Automatic Update Detection
+
+Scans the Drupal Update Status report and detects:
+
+- current modules
+- available updates
+- security updates
+- unsupported modules
+
+## Composer Command Generation
+
+Generates ready-to-run commands such as:
+
+    composer require -W "drupal/module:version"
+
+## Commit Message Generator
+
+Creates formatted commit messages suitable for Git commits.
+
+## Multiple Output Formats
+
+| Output | Description |
+|------|------|
+| Composer | Ready-to-paste composer command |
+| Commit msg | Git commit message |
+| ASCII | Table formatted report |
+| JSON | Raw structured data |
+| Composer JSON | `require` block for composer.json |
+| CSV | Downloadable update report |
+| Modules | List of enabled modules |
+| Modules CSV | CSV export of modules |
+| Modules Status | Table of module update status |
+| Modules Status CSV | CSV status export |
+
+## Scope Filtering
+
+Filter results by update type:
+
+- security
+- update
+- updatable
+- unsupported
+- current
+- all
+
+## Version Overrides
+
+Force specific versions for modules.
+
+Example:
+
+    drupal/webform=6.3.0
+
+or JSON format:
+
+    {
+      "drupal/webform": "6.3.0"
+    }
+
+## Copy-Ready Output
+
+All results appear in the DURT output panel and can be copied directly.
 
 ---
 
-## 📎 Setup
+# Requirements
 
-### Option 1: Bookmarklet
+- Modern browser with JavaScript enabled
+- Access to the Drupal update report page
 
-1. **Compile** the `full_report_tool.js` using your minifier and URI encoder.
-2. Create a new **browser bookmark**.
-3. Paste the minified, encoded script into the **URL field**.
-4. Click the bookmark while on `/admin/reports/updates`.
+  /admin/reports/updates
 
-### Option 2: Manual Console Paste
+Compatible with:
 
-1. Navigate to your Drupal site's `/admin/reports/updates`.
-2. Open **Developer Tools** (F12 or Ctrl+Shift+I).
-3. Paste the script into the **Console** tab.
-4. Press Enter.
+- Drupal 8
+- Drupal 9
+- Drupal 10
+- Drupal 11
 
 ---
 
-## 🔧 Usage Examples
+# Installation
 
-You control the output using the global function `generateUpdateReport()`.
+## Bookmarklet
 
-### Basic Outputs
+1. Minify the DURT script.
+2. Create a new browser bookmark.
+3. Paste the minified script into the bookmark URL field.
+4. Navigate to:
 
-```js
-generateUpdateReport("ascii");         // Display ASCII table in console
-generateUpdateReport("csv");           // Download CSV file
-generateUpdateReport("json");          // Output raw JSON
-generateUpdateReport("commit");        // Generate commit message
-generateUpdateReport("composer");      // Output composer commands (recommended)
+       /admin/reports/updates
+
+5. Click the bookmark to launch DURT.
+
+---
+
+# Using DURT
+
+When launched, DURT opens a floating control panel.
+
+## Select Scope
+
+Choose which updates should be included:
+
+- Security updates
+- Available updates
+- Unsupported modules
+- All modules
+
+## Optional Settings
+
+### Wrap JSON
+
+Wrap Composer JSON output inside:
+
+    {
+      "require": {}
+    }
+
+### Overrides
+
+Override specific versions.
+
+Example:
+
+    drupal/pathauto=1.13
+
+---
+
+# Run Outputs
+
+Use the panel buttons to generate output.
+
+| Button | Output |
+|------|------|
+| Composer | Composer require command |
+| Commit msg | Git commit message |
+| ASCII | Table report |
+| JSON | Raw data |
+| Composer JSON | JSON require block |
+| CSV download | CSV report |
+| Modules | List of modules |
+| Modules CSV | CSV module list |
+| Modules Status | Module status table |
+| Modules Status CSV | CSV status export |
+
+---
+
+# Output Panel
+
+Results appear in the **Output** area.
+
+| Button | Function |
+|------|------|
+| Clear | Clear output |
+| Copy | Copy output to clipboard |
+
+The output contains only the generated result, ready for direct paste into:
+
+- terminal commands
+- commit messages
+- documentation
+- spreadsheets
+
+---
+
+# Security
+
+This tool:
+
+- runs entirely in the browser
+- does not send data externally
+- does not modify your Drupal site
+- requires no installation
+
+It only reads the contents of the update report page.
+
+---
+
+# Tips
+
+- Use **Composer output** for quick updates.
+- Use **Commit output** for consistent Git commits.
+- Use **CSV export** to track updates across multiple sites.
